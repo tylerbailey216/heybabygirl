@@ -32,3 +32,9 @@ After the blackout, approach the table, grab it, and move toward the entry to de
 ## Verification
 
 The production build passes. The game simulation was exercised for the barricade delay, hiding through entry, successful escape, capture, and a fresh escape after state reset. Browser rendering and physical iPhone input still need a smoke test.
+
+## GitHub Pages
+
+Set **Settings → Pages → Build and deployment → Source** to **GitHub Actions**.
+The deployment workflow builds and publishes `dist/` on pushes to `main`.
+The build uses relative asset URLs so it works at the repository's Pages path.
