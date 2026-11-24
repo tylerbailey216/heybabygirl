@@ -1,2 +1,34 @@
-# heybabygirl
-Game Demo #1
+# Hey Baby Girl · Blackout Date
+
+A first playable 3D browser demo. A dinner date turns into a supernatural apartment escape when the power drops. Built with Three.js and Vite with cel-shaded placeholder geometry.
+
+## Run locally
+
+Use Node.js 20.19+, 22.12+, or a supported newer release, and a browser with WebGL 2.
+
+```sh
+npm ci
+npm run dev
+```
+
+Open the URL Vite prints. Use `npm run dev -- --host 0.0.0.0` to try the demo in Safari on an iPhone on the same local network. Open the network URL Vite prints on the phone.
+
+```sh
+npm run build
+npm run preview
+```
+
+## Controls
+
+| Action | Keyboard | Touch |
+| --- | --- | --- |
+| Advance dialogue | Enter, Space or E | Tap the response |
+| Move | WASD or arrow keys | Hold the directional pad |
+| Interact | E | Tap the action button |
+| Restart | R | Tap Restart |
+
+After the blackout, approach the table, grab it, and move toward the entry to delay the pursuer. Interact near the hanging coats to hide or emerge. At the balcony, interact with the latch and stay still until it opens. If caught, **Retry blackout** starts a fresh escape attempt. After escaping, **Play again** returns to the date.
+
+## Verification
+
+The production build passes. The game simulation was exercised for the barricade delay, hiding through entry, successful escape, capture, and a fresh escape after state reset. Browser rendering and physical iPhone input still need a smoke test.
