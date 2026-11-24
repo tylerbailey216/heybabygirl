@@ -1,6 +1,10 @@
 import * as T from 'three'
 import { spots } from './game.js'
 import { createHeroine } from './heroine.js'
+import woodUrl from './assets/wood.webp'
+import plasterUrl from './assets/plaster.webp'
+import rugUrl from './assets/rug.webp'
+import fabricUrl from './assets/upholstery.webp'
 
 export function createView(container) {
   const scene = new T.Scene()
@@ -13,14 +17,41 @@ export function createView(container) {
   renderer.outputColorSpace = T.SRGBColorSpace
   container.append(renderer.domElement)
 
-  const gradient = new T.DataTexture(new Uint8Array([78, 153, 255]), 3, 1, T.RedFormat)
+  const gradient = new T.DataTexture(new Uint8Array([83, 119, 155, 195, 231, 255]), 6, 1, T.RedFormat)
   gradient.minFilter = gradient.magFilter = T.NearestFilter
   gradient.needsUpdate = true
-  const ink = new T.LineBasicMaterial({ color: '#21141e', transparent: true, opacity: .87 })
+  const ink = new T.LineBasicMaterial({ color: '#301e25', transparent: true, opacity: .67 })
   const silhouette = new T.MeshBasicMaterial({ color: '#21141e', side: T.BackSide })
+  const loader = new T.TextureLoader()
+  function surface(url) {
+    const map = loader.load(url)
+    map.colorSpace = T.SRGBColorSpace
+    map.anisotropy = Math.min(4, renderer.capabilities.getMaxAnisotropy())
+    return map
+  }
+  const wood = surface(woodUrl)
+  const plaster = surface(plasterUrl)
+  const weave = surface(rugUrl)
+  const upholstery = surface(fabricUrl)
+  const surfaceMaps = new Map([
+    ['#72504c', wood], ['#81574b', wood], ['#8e6253', wood], ['#77504b', wood],
+    ['#a97150', wood], ['#935548', wood], ['#925d48', wood],
+    ['#ad8079', plaster], ['#a77773', plaster],
+    ['#c8908e', weave], ['#af777b', weave],
+    ['#946669', upholstery], ['#ce9587', upholstery], ['#c08a7e', upholstery],
+    ['#b47a74', upholstery], ['#934d63', upholstery],
+  ])
   const materials = new Map()
   function shape(parent, geometry, color, x, y, z, outline = true) {
-    if (!materials.has(color)) materials.set(color, new T.MeshToonMaterial({ color, gradientMap: gradient }))
+    if (!materials.has(color)) {
+      const map = surfaceMaps.get(color)
+      const tint = new T.Color(color)
+      if (map) tint.lerp(new T.Color('#ffffff'), .74)
+      const material = map
+        ? new T.MeshStandardMaterial({ color: tint, map, roughness: .92 })
+        : new T.MeshToonMaterial({ color, gradientMap: gradient })
+      materials.set(color, material)
+    }
     const mesh = new T.Mesh(geometry, materials.get(color))
     mesh.position.set(x, y, z)
     if (outline) mesh.add(new T.LineSegments(new T.EdgesGeometry(geometry, 34), ink))
@@ -35,6 +66,28 @@ export function createView(container) {
     const geometry = new T.SphereGeometry(1, 16, 12)
     const mesh = shape(parent, geometry.clone().scale(w, h, d), color, x, y, z, false)
     mesh.add(new T.Mesh(geometry.scale(w + .015, h + .015, d + .015), silhouette))
+    return mesh
+  }
+  const falloff = new Uint8Array(64 * 64 * 4)
+  for (let y = 0; y < 64; y++) {
+    for (let x = 0; x < 64; x++) {
+      const radius = Math.min(1, Math.hypot(x - 31.5, y - 31.5) / 31.5)
+      falloff.set([255, 255, 255, Math.round(255 * (1 - radius) ** 2)], (y * 64 + x) * 4)
+    }
+  }
+  const shadowMap = new T.DataTexture(falloff, 64, 64)
+  shadowMap.magFilter = T.LinearFilter
+  shadowMap.minFilter = T.LinearFilter
+  shadowMap.needsUpdate = true
+  function contact(parent, x, z, w, d, opacity) {
+    const material = new T.MeshBasicMaterial({
+      color: '#27151f', map: shadowMap, transparent: true, opacity, depthWrite: false,
+      polygonOffset: true, polygonOffsetFactor: -1,
+    })
+    const mesh = new T.Mesh(new T.PlaneGeometry(w, d), material)
+    mesh.rotation.x = -Math.PI / 2
+    mesh.position.set(x, .057, z)
+    parent.add(mesh)
     return mesh
   }
   const room = new T.Group()
@@ -162,8 +215,21 @@ export function createView(container) {
     oval(coat, cloth, .25, 1.32, .02, .11, .47, .12).rotation.z = .16
   }
 
+  const blanket = box(room, '#8d515f', 2.49, 1.216, 3.38, .87, .045, .34)
+  blanket.rotation.y = -.035
+  box(room, '#8d515f', 2.49, .96, 3.219, .87, .48, .026)
+  for (let i = 0; i < 8; i++) {
+    const x = 2.12 + i * .105
+    box(room, '#a86670', x, .96, 3.202, .035, .46, .008, false)
+  }
+  contact(room, 2.3, 2.78, 5.6, 2.6, .63)
+  contact(room, -4.69, 2.44, 2.07, 2.33, .66)
+  contact(room, -2.45, -3.5, 3.5, 1.6, .63)
+  contact(room, -4.95, .15, 1.8, 1.5, .49)
+
   const table = new T.Group()
   room.add(table)
+  contact(table, .1, .18, 3.55, 2.72, .69)
   box(table, '#a97150', 0, .91, 0, 2.45, .13, 1.42)
   box(table, '#674137', 0, .76, 0, 2.18, .18, 1.17)
   for (const x of [-1.04, 1.04]) for (const z of [-.55, .55]) box(table, '#754b3c', x, .42, z, .17, .84, .17)
@@ -236,6 +302,7 @@ export function createView(container) {
   }
   const player = character('heroine')
   const poseHeroine = createHeroine(scene, player.group)
+  const heroineShadow = contact(room, 0, 0, 1.05, .65, .75)
   const date = character('date')
   const pursuer = character('shadow')
   date.group.position.set(.3, 0, -2.23)
@@ -281,10 +348,10 @@ export function createView(container) {
   function render(game, time) {
     const blackout = game.phase !== 'date'
     const inside = blackout && game.elapsed >= game.entryAt
-    ceiling.intensity = blackout ? .18 : 2.05
-    ambient.intensity = blackout ? .75 : 1.18
-    moon.intensity = blackout ? 30 : 15
-    candle.intensity = (blackout ? 23 : 11) + Math.sin(time * 19) * 1.4 + Math.sin(time * 8) * 1.2
+    ceiling.intensity = blackout ? .12 : 2.05
+    ambient.intensity = blackout ? .63 : 1.18
+    moon.intensity = blackout ? 39 : 15
+    candle.intensity = (blackout ? 29 : 11) + Math.sin(time * 19) * 1.4 + Math.sin(time * 8) * 1.2
     flame.scale.y = 1 + Math.sin(time * 16) * .13
     table.position.set(game.table.x, 0, game.table.z)
     door.rotation.y = inside ? -.86 : 0
@@ -293,6 +360,9 @@ export function createView(container) {
     pursuer.group.visible = blackout
     actorPose(player, game.player, time)
     poseHeroine(game, time)
+    heroineShadow.position.x = game.player.x
+    heroineShadow.position.z = game.player.z + .06
+    heroineShadow.visible = !game.hidden
     actorPose(pursuer, inside ? game.pursuer : { x: 3.83, z: -4.66 }, time)
     if (!inside) pursuer.group.rotation.y = 0
     labels[2].position.set(game.table.x, 1.42, game.table.z)
