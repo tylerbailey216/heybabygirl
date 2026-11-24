@@ -1,5 +1,6 @@
 import * as T from 'three'
 import { spots } from './game.js'
+import { createHeroine } from './heroine.js'
 
 export function createView(container) {
   const scene = new T.Scene()
@@ -234,6 +235,7 @@ export function createView(container) {
     return { group, legs }
   }
   const player = character('heroine')
+  const poseHeroine = createHeroine(scene, player.group)
   const date = character('date')
   const pursuer = character('shadow')
   date.group.position.set(.3, 0, -2.23)
@@ -290,7 +292,7 @@ export function createView(container) {
     date.group.visible = !blackout
     pursuer.group.visible = blackout
     actorPose(player, game.player, time)
-    player.group.visible = !game.hidden
+    poseHeroine(game, time)
     actorPose(pursuer, inside ? game.pursuer : { x: 3.83, z: -4.66 }, time)
     if (!inside) pursuer.group.rotation.y = 0
     labels[2].position.set(game.table.x, 1.42, game.table.z)
