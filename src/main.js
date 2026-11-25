@@ -18,6 +18,7 @@ const entityVoice = document.querySelector('#entity-voice')
 const entityPortraits = [tallPortrait, heavyPortrait, wiryPortrait]
 let shownEntity = -1
 let voiceEndsAt = 0
+const entityEntranceBeat = .9
 const speaker = document.querySelector('#speaker')
 const line = document.querySelector('#line')
 const advance = document.querySelector('#continue')
@@ -142,7 +143,9 @@ if (view) {
 
     const playing = game.phase === 'blackout'
     const prompt = game.action()
-    if (playing && game.entityInside() && shownEntity !== game.encounters) {
+    const arrivalAt = Math.max(game.entryAt, game.reappearsAt)
+    const entityInside = playing && game.entityInside()
+    if (entityInside && game.elapsed >= arrivalAt + entityEntranceBeat && shownEntity !== game.encounters) {
       shownEntity = game.encounters
       entityPortrait.src = entityPortraits[shownEntity]
       entityPortrait.alt = entityTypes[shownEntity].name
@@ -152,7 +155,7 @@ if (view) {
       playEntitySound(voice)
       voiceEndsAt = game.elapsed + 2.7
     }
-    const showEntityDialogue = playing && game.elapsed < voiceEndsAt
+    const showEntityDialogue = entityInside && game.elapsed < voiceEndsAt
     if (!showEntityDialogue && !entityDialogue.hidden) {
       entityDialogue.hidden = true
       entityVoice.textContent = ''
@@ -162,9 +165,14 @@ if (view) {
       darkness.classList.toggle('blackout-complete', game.encounters >= encounterLimit)
       previousEncounterCount = game.encounters
     }
-    const timing = game.elapsed < game.entryAt
-      ? (game.elapsed < 6 ? 'The power is out' : 'Something’s at the door')
-      : game.entityInside() ? 'It’s inside' : 'It vanished'
+    const secondsToArrival = Math.ceil(arrivalAt - game.elapsed)
+    let timing = entityInside ? 'It’s inside' : 'It vanished'
+    if (game.elapsed < game.entryAt) {
+      timing = game.elapsed < 6 ? 'The power is out' : 'Something’s at the door'
+    }
+    if (secondsToArrival > 0 && secondsToArrival <= 5) {
+      timing = `${game.encounters ? 'Returns' : 'Entry'} in ${secondsToArrival}s`
+    }
     let hint = prompt || 'Get to the balcony latch'
     if (game.latch > 0) hint = 'Opening the latch… Hold still'
     else if (game.dragging) hint = 'Drag the table toward the entry'

@@ -7,8 +7,10 @@ const walkFrames = [1, 2, 3, 2]
 const frameRate = 9
 
 export function createHeroine(scene, fallback) {
-  const material = new T.SpriteMaterial({ alphaTest: .08 })
+  // Keep the screen-facing art intact when it overlaps furniture in projection.
+  const material = new T.SpriteMaterial({ alphaTest: .08, depthTest: false, depthWrite: false })
   const sprite = new T.Sprite(material)
+  sprite.renderOrder = 10
   sprite.center.set(.5, 7 / 360)
   const height = 2.08
   sprite.scale.set(height * 200 / 360, height, 1)
