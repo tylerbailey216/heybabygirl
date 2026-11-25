@@ -13,6 +13,9 @@ export const sipDuration = 4.2
 export const wakeGoal = 7
 export const phoneDarkDuration = 3.2
 export const phoneRushDuration = 1.45
+export const streetLightFade = 1.6
+export const streetWakeSeconds = 7
+export const streetIntersection = { x: 8.75, z: .3 }
 export const streetProps = [
   { x: -1.9, z: -.95, w: .65, d: .6 },
   { x: 1.75, z: -.65, w: .72, d: .7 },
@@ -42,7 +45,7 @@ export function createGame(setbacks = {}) {
     phase: 'party', introElapsed: 0, wakeProgress: 0, penalties, player: { ...start }, table: { ...tableStart },
     pursuer: { ...spots.entry }, elapsed: 0, entryAt: Infinity, reappearsAt: 0, encounters: 0,
     hidden: false, dragging: false, barricade: false, latch: 0,
-    hasPin: false, examinedLatch: false, heardVoice: false, cinematicElapsed: 0, phoneElapsed: 0,
+    hasPin: false, examinedLatch: false, heardVoice: false, cinematicElapsed: 0, phoneElapsed: 0, streetChaseFailed: false,
   }
 
   function clear(x, z, actor) {
@@ -64,6 +67,7 @@ export function createGame(setbacks = {}) {
       return distance(game.player, spots.landing) < .85 ? 'Step onto street' : ''
     }
     if (game.phase === 'street') return game.heardVoice ? 'Look up' : 'Listen'
+    if (game.phase === 'streetSafe') return 'End chapter'
     if (game.phase !== 'blackout') return ''
     if (game.hidden) return 'Leave hiding spot'
     if (game.dragging) return 'Let go of table'
@@ -100,6 +104,7 @@ export function createGame(setbacks = {}) {
       case 'Step onto street': game.phase = 'street'; break
       case 'Listen': game.heardVoice = true; break
       case 'Look up': game.phase = 'descent'; break
+      case 'End chapter': game.phase = 'complete'; break
       case 'Hide behind coats': game.hidden = true; game.latch = 0; break
       case 'Grab dining table': game.dragging = true; break
     }
@@ -124,10 +129,24 @@ export function createGame(setbacks = {}) {
     Object.assign(game.player, { x: 0, z: .35 })
   }
 
-  function retryPhoneTrap() {
-    if (game.phase !== 'phoneCaught') return
+  function retryStreet() {
+    if (game.phase !== 'phoneCaught' && game.phase !== 'street') return
+    game.phase = 'streetDazed'
     game.phoneElapsed = 0
-    game.phase = 'street'
+    game.wakeProgress = 0
+    game.streetChaseFailed = false
+    lastShake = undefined
+    lastShakeAt = -Infinity
+    Object.assign(game.player, { x: 0, z: .35 })
+  }
+
+  function moveOnStreet(dx, dz, maxX) {
+    const { player } = game
+    const open = (x, z) => x >= Math.max(-3.7, -maxX) && x <= maxX && z >= -1.55 && z <= 2
+      && !streetProps.some(prop => Math.abs(x - prop.x) < prop.w / 2 + .22
+        && Math.abs(z - prop.z) < prop.d / 2 + .22)
+    if (open(player.x + dx, player.z)) player.x += dx
+    if (open(player.x, player.z + dz)) player.z += dz
   }
 
   // Use a small navigation grid so the pursuer can go around furniture.
@@ -160,6 +179,16 @@ export function createGame(setbacks = {}) {
   let repath = 0
   let lastShake
   let lastShakeAt = -Infinity
+  function shake(x, z, length, time) {
+    if (game.wakeProgress >= wakeGoal || length < .48 || time - lastShakeAt < .075) return
+    x /= length
+    z /= length
+    if (lastShake && x * lastShake.x + z * lastShake.z > -.24) return
+    if (lastShake) game.wakeProgress++
+    lastShake = { x, z }
+    lastShakeAt = time
+  }
+
   function update(dt, inputX, inputZ) {
     if (game.phase === 'party' || game.phase === 'sip') {
       game.introElapsed += dt
@@ -177,15 +206,44 @@ export function createGame(setbacks = {}) {
     if (game.phase === 'phoneDark') {
       game.phoneElapsed += dt
       const step = 1.6 * dt / normalizer
-      const { player } = game
-      const open = (x, z) => Math.abs(x) <= 2.8 && z >= -1.55 && z <= 2
-        && !streetProps.some(prop => Math.abs(x - prop.x) < prop.w / 2 + .22
-          && Math.abs(z - prop.z) < prop.d / 2 + .22)
-      if (open(player.x + inputX * step, player.z)) player.x += inputX * step
-      if (open(player.x, player.z + inputZ * step)) player.z += inputZ * step
+      moveOnStreet(inputX * step, inputZ * step, 2.8)
       if (game.phoneElapsed >= phoneDarkDuration) {
         game.phase = 'phoneRush'
         game.phoneElapsed -= phoneDarkDuration
+      }
+      return
+    }
+    if (game.phase === 'streetDazed') {
+      game.phoneElapsed += dt
+      const wakeTime = game.phoneElapsed - streetLightFade
+      if (wakeTime < 0) return
+      if (wakeTime < streetWakeSeconds) shake(inputX, inputZ, length, wakeTime)
+      if (game.wakeProgress === wakeGoal) {
+        game.phase = 'streetRun'
+        game.phoneElapsed = 0
+        Object.assign(game.pursuer, { x: -3.45, z: .52 })
+      } else if (wakeTime >= streetWakeSeconds) {
+        game.phase = 'phoneRush'
+        game.phoneElapsed = wakeTime - streetWakeSeconds
+      }
+      return
+    }
+    if (game.phase === 'streetRun') {
+      const step = 3.45 * dt / normalizer
+      moveOnStreet(inputX * step, inputZ * step, 9.5)
+      if (distance(game.player, streetIntersection) < .92) {
+        game.phase = 'streetSafe'
+        return
+      }
+      const range = distance(game.pursuer, game.player)
+      if (range <= .65) {
+        game.streetChaseFailed = true
+        game.phoneElapsed = 0
+        game.phase = 'phoneRush'
+      } else {
+        const stride = Math.min(range, dt * 2.48) / range
+        game.pursuer.x += (game.player.x - game.pursuer.x) * stride
+        game.pursuer.z += (game.player.z - game.pursuer.z) * stride
       }
       return
     }
@@ -203,15 +261,7 @@ export function createGame(setbacks = {}) {
     const waking = game.phase === 'waking'
     if (!waking && game.phase !== 'blackout') return
     game.elapsed += dt
-    if (waking && game.wakeProgress < wakeGoal && length >= .48 && game.elapsed - lastShakeAt >= .075) {
-      const x = inputX / length
-      const z = inputZ / length
-      if (!lastShake || x * lastShake.x + z * lastShake.z <= -.24) {
-        if (lastShake) game.wakeProgress++
-        lastShake = { x, z }
-        lastShakeAt = game.elapsed
-      }
-    }
+    if (waking) shake(inputX, inputZ, length, game.elapsed)
     if (waking && game.wakeProgress === wakeGoal && game.elapsed - lastShakeAt >= .16) game.phase = 'blackout'
     if (!waking && !game.hidden && length) {
       const speed = game.dragging ? 1.8 : 3.35
@@ -274,5 +324,5 @@ export function createGame(setbacks = {}) {
     return game.elapsed >= entityArrivalAt()
   }
 
-  return Object.assign(game, { action, interact, update, entityArrivalAt, entityInside, beginSip, beginWake, beginPhoneTrap, retryPhoneTrap })
+  return Object.assign(game, { action, interact, update, entityArrivalAt, entityInside, beginSip, beginWake, beginPhoneTrap, retryStreet })
 }

@@ -50,7 +50,7 @@ export function createHeroine(scene, fallback) {
     const dx = player.x - previous.x
     const dz = player.z - previous.y
     previous.set(player.x, player.z)
-    const moving = (phase === 'blackout' || phase === 'fireEscape' || phase === 'phoneDark') && !game.hidden && Math.hypot(dx, dz) > .0001
+    const moving = (phase === 'blackout' || phase === 'fireEscape' || phase === 'phoneDark' || phase === 'streetDazed' || phase === 'streetRun' || phase === 'streetSafe' || phase === 'streetRun') && !game.hidden && Math.hypot(dx, dz) > .0001
     if (moving) {
       walkStarted ??= time
       row = Math.abs(dx) > Math.abs(dz) ? 1 : dz < 0 ? 2 : 0
@@ -69,7 +69,7 @@ export function createHeroine(scene, fallback) {
 
     if (phase === 'party' || phase === 'date' || phase === 'sip') {
       material.color.copy(dateLight)
-    } else if (phase === 'fireEscape' || phase === 'phoneDark') {
+    } else if (phase === 'fireEscape' || phase === 'phoneDark' || phase === 'streetDazed' || phase === 'streetRun' || phase === 'streetSafe') {
       material.color.copy(moonLight)
     } else {
       const candle = Math.max(0, 1 - Math.hypot(player.x - table.x, player.z - table.z) / 5)

@@ -1,5 +1,5 @@
 import * as T from 'three'
-import { descentDelays, entityTypes, guestDepartureTimes, partyDuration, phoneRushDuration, spots, streetProps } from './game.js'
+import { descentDelays, entityTypes, guestDepartureTimes, partyDuration, phoneRushDuration, spots, streetIntersection, streetLightFade, streetProps } from './game.js'
 import { createHeroine } from './heroine.js'
 import woodUrl from './assets/wood.webp'
 import plasterUrl from './assets/plaster.webp'
@@ -402,7 +402,21 @@ export function createView(container) {
   const phoneStreet = new T.Group()
   phoneStreet.visible = false
   scene.add(phoneStreet)
-  box(phoneStreet, '#23283a', 0, -.13, .15, 8.2, .25, 13.2, false)
+  box(phoneStreet, '#23283a', 2.8, -.13, .15, 14, .25, 13.2, false)
+  box(phoneStreet, '#303748', 6.1, .018, -1.85, 4.15, .095, .35)
+  for (let i = 0; i < 6; i++) {
+    box(phoneStreet, '#9a9da9', streetIntersection.x, .006, -1.28 + i * .57, 1.65, .016, .23, false)
+  }
+  const streetLamp = new T.Group()
+  phoneStreet.add(streetLamp)
+  streetLamp.position.set(streetIntersection.x, 0, -1.96)
+  box(streetLamp, '#535e71', 0, 1.47, 0, .11, 2.94, .11)
+  box(streetLamp, '#525b6e', 0, 2.88, .42, .13, .1, .83)
+  const lampLens = box(streetLamp, '#f6d8a8', 0, 2.78, .86, .46, .08, .32)
+  lampLens.material = new T.MeshBasicMaterial({ color: '#fff0c7' })
+  const intersectionLight = new T.PointLight('#ffe0b1', 52, 8, 2)
+  intersectionLight.position.set(0, 2.68, .84)
+  streetLamp.add(intersectionLight)
   box(phoneStreet, '#323747', 0, .025, -1.85, 8.2, .09, .35)
   box(phoneStreet, '#1a1d2c', 0, .09, -4.45, 8.2, .22, 5, false)
   for (let i = 0; i < 12; i++) {
@@ -491,9 +505,19 @@ export function createView(container) {
     const outside = game.phase === 'fireEscape' || cinematic
     const phoneDark = game.phase === 'phoneDark'
     const phoneRush = game.phase === 'phoneRush'
-    const trap = phoneDark || phoneRush
+    const streetDazed = game.phase === 'streetDazed'
+    const streetRun = game.phase === 'streetRun'
+    const streetSafe = game.phase === 'streetSafe'
+    const streetChase = streetRun || streetSafe
+    const trap = phoneDark || phoneRush || streetDazed || streetChase
     const pan = cinematic && !reducedMotion.matches ? game.cinematicElapsed * .085 : 0
-    if (phoneDark) {
+    if (streetChase) {
+      const { x, z } = game.player
+      const lead = Math.min(x + 1.65, streetIntersection.x - .25)
+      camera.position.set(lead, 10.8, z + 6.7)
+      camera.lookAt(lead, .27, z)
+      camera.zoom = 1.23
+    } else if (phoneDark || streetDazed) {
       const { x, z } = game.player
       camera.position.set(x, 10.5, z + 6.5)
       camera.lookAt(x, .35, z)
@@ -523,16 +547,20 @@ export function createView(container) {
     fireEscape.visible = outside
     phoneStreet.visible = trap
     outsideRain.visible = outside || trap
-    outsideRain.material.opacity = phoneDark ? .14 : phoneRush ? .32 : .48
-    phoneLight.visible = phoneDark
-    phonePool.visible = phoneDark
+    outsideRain.material.opacity = phoneDark || streetDazed ? .14 : phoneRush ? .32 : .48
+    const phoneBrightness = phoneDark ? 1 : streetDazed ? Math.max(0, 1 - game.phoneElapsed / streetLightFade) : 0
+    phoneLight.visible = phoneBrightness > 0
+    phonePool.visible = phoneLight.visible
+    phoneLight.intensity = 7.8 * phoneBrightness
+    phonePool.material.opacity = .42 * phoneBrightness
     rushLight.visible = phoneRush
-    if (phoneDark) {
+    streetLamp.visible = streetChase
+    if (phoneLight.visible) {
       phoneLight.position.set(game.player.x, 1.03, game.player.z - .22)
       phonePool.position.set(game.player.x, .008, game.player.z)
     }
     ceiling.intensity = blackout ? .04 : 2.1 - night * 1.15
-    ambient.intensity = trap ? .022 : blackout ? .31 : 1.21 - night * .38
+    ambient.intensity = streetChase ? .075 : trap ? .022 : blackout ? .31 : 1.21 - night * .38
     moon.intensity = trap ? 0 : blackout ? 26 : 12 + night * 9
     partyLight.intensity = partyScene ? (1 - night * .78) * (18 + Math.sin(time * 4.4) * 4) : 0
     dreamLight.intensity = dreaming ? 8 + Math.sin(time * 2.8) * 1.45 : 0
@@ -570,7 +598,7 @@ export function createView(container) {
       drink.position.set(.26 - lift * .18, 1.02 + lift * .5, 1.18)
       drink.rotation.z = -.21 * lift
     }
-    pursuer.group.visible = inside || phoneRush
+    pursuer.group.visible = inside || phoneRush || streetRun
     actorPose(player, game.player, time)
     player.group.position.y = ground
     poseHeroine(game, time, ground)
@@ -586,17 +614,17 @@ export function createView(container) {
       pursuer.group.rotation.x = -.35
       pursuer.group.scale.set(1.17, .75, 1.35)
       poseWisps(pursuer, time * 2.1)
-    } else if (inside) actorPose(pursuer, game.pursuer, time)
+    } else if (inside || streetRun) actorPose(pursuer, game.pursuer, streetRun ? time * 1.54 : time)
     else {
       pursuer.group.position.set(game.pursuer.x, 0, game.pursuer.z)
       pursuer.group.rotation.y = 0
     }
     const entity = entityTypes[Math.min(game.encounters, entityTypes.length - 1)]
     if (!phoneRush) {
-      pursuer.group.scale.set(...entity.scale)
-      pursuer.group.rotation.x = 0
+      pursuer.group.scale.set(...(streetRun ? [1.12, .96, 1.2] : entity.scale))
+      pursuer.group.rotation.x = streetRun ? -.17 : 0
     }
-    if (inside) poseWisps(pursuer, time)
+    if (inside || streetRun) poseWisps(pursuer, time)
     procession.forEach((actor, index) => {
       const walkTime = game.cinematicElapsed - descentDelays[index]
       actor.group.visible = cinematic && walkTime >= 0
@@ -630,7 +658,7 @@ export function createView(container) {
     }
     if (outsideRain.visible) {
       for (let i = 0; i < outsideDrops.length / 6; i++) {
-        const x = ((i * .61803399) % 1) * 12 - 6
+        const x = ((i * .61803399) % 1) * (streetChase ? 15 : 12) - (streetChase ? 4 : 6)
         const y = 3.4 - ((i * .387 + time * (.66 + i % 4 * .12)) % 1) * 6
         const z = ((i * .733) % 1) * (trap ? 10 : 3.8) - (trap ? 6 : 1.15)
         outsideDrops.set([x, y, z, x + .055, y + .21, z], i * 6)

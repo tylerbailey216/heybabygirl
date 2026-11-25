@@ -29,7 +29,7 @@ Tap a dialogue response or press **1** or **2**. Each prompt has one response th
 | Interact | E | Tap the active Table, Hide, Inspect, or Latch button |
 | Restart | R | Tap Restart |
 
-After the drink sequence, shake the thumbstick left and right or alternate A and D to fill the wake meter. Once the heroine can move, get the release pin and head for the balcony. A barricade can still delay an entry while the door is closed. Interact near the hanging coats to hide or emerge. Find the balcony release pin in the sideboard. Use the pin at the balcony and stay still until the latch opens. Cross the fire escape, step onto the street, and choose whether to check the phone. The ending cutscene leads to a restart screen. If caught, **Retry blackout** starts a fresh escape attempt. After escaping, **Play again** returns to the date.
+After the drink sequence, shake the thumbstick left and right or alternate A and D to fill the wake meter. Once the heroine can move, get the release pin and head for the balcony. A barricade can still delay an entry while the door is closed. Interact near the hanging coats to hide or emerge. Find the balcony release pin in the sideboard. Use the pin at the balcony and stay still until the latch opens. Cross the fire escape, step onto the street, and choose whether to check the phone. The ending cutscene leads to a restart screen. If the phone trap catches you, retry the street, shake awake within seven seconds after the light goes out, then run right to the lit intersection. If caught, **Retry blackout** starts a fresh escape attempt. After escaping, **Play again** returns to the date.
 
 ## Verification
 

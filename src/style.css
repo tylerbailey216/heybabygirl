@@ -314,3 +314,12 @@ kbd{border:1px solid #bd8f8170;border-radius:4px;padding:.1rem .3rem;margin-left
 @media(prefers-reduced-motion:reduce){
   #game[data-phase="sip"] #scene,#game[data-phase="waking"] #scene canvas{animation:none}
 }
+
+
+#wake-timer{margin:0 0 .55rem;color:#d0baff;font-size:1.05rem;font-weight:800;font-variant-numeric:tabular-nums}
+#game:is([data-phase="streetDazed"],[data-phase="streetRun"],[data-phase="streetSafe"]) :is(header,footer){visibility:hidden}
+#game[data-phase="streetDazed"] #thumbstick{border-color:#bc9eff;box-shadow:0 0 24px #8253d6aa}
+#game[data-phase="streetDazed"] #scene canvas{animation:dream-focus 2.7s ease-in-out infinite alternate}
+@media(prefers-reduced-motion:reduce){
+  #game[data-phase="streetDazed"] #scene canvas{animation:none}
+}
