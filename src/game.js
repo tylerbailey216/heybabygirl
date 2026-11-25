@@ -1,4 +1,9 @@
-export const encounterLimit = 3
+export const entityTypes = [
+  { name: 'Tall shadow', voice: 'Growl', speed: 1.02, reach: .67, recovery: 6, scale: [.86, 1.58, .86] },
+  { name: 'Heavy shadow', voice: 'Grunt', speed: .78, reach: .84, recovery: 5, scale: [1.38, 1.42, 1.25] },
+  { name: 'Wiry shadow', voice: 'Hiss', speed: 1.2, reach: .57, recovery: 6, scale: [.94, 1.13, .95] },
+]
+export const encounterLimit = entityTypes.length
 
 export const spots = {
   entry: { x: -5.2, z: -2.4 },
@@ -113,6 +118,7 @@ export function createGame() {
       }
     }
     if (entityInside()) {
+      const entity = entityTypes[game.encounters]
       const patrol = game.elapsed % 10 < 5 ? { x: 0, z: 1.4 } : { x: 2.85, z: -2.1 }
       const target = game.hidden ? patrol : game.player
       repath -= dt
@@ -122,16 +128,16 @@ export function createGame() {
       }
       const range = distance(game.pursuer, waypoint)
       if (range > 0.01) {
-        const amount = Math.min(range, dt * (game.hidden ? .72 : 1.13)) / range
+        const amount = Math.min(range, dt * entity.speed * (game.hidden ? .64 : 1)) / range
         move(game.pursuer, (waypoint.x - game.pursuer.x) * amount, (waypoint.z - game.pursuer.z) * amount)
       }
-      if (!game.hidden && distance(game.player, game.pursuer) < 0.67) {
+      if (!game.hidden && distance(game.player, game.pursuer) < entity.reach) {
         game.encounters++
         if (game.encounters >= encounterLimit) {
           game.phase = 'caught'
           return
         }
-        game.reappearsAt = game.elapsed + 6
+        game.reappearsAt = game.elapsed + entity.recovery
         Object.assign(game.pursuer, game.barricade ? { x: -4.9, z: -1.45 } : spots.entry)
         waypoint = undefined
       }

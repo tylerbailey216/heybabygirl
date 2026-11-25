@@ -1,13 +1,23 @@
 import './style.css'
-import { createGame, encounterLimit } from './game.js'
+import { createGame, encounterLimit, entityTypes } from './game.js'
 import { createView } from './view.js'
 import { bindThumbstick } from './thumbstick.js'
+import { enableEntityAudio, playEntitySound } from './entity-audio.js'
 import heroinePortrait from './assets/heroine-portrait.webp'
 import datePortrait from './assets/date-portrait.webp'
+import tallPortrait from './assets/shadow-tall.webp'
+import heavyPortrait from './assets/shadow-heavy.webp'
+import wiryPortrait from './assets/shadow-wiry.webp'
 
 const dialogueLayer = document.querySelector('#dialogue')
 const portrait = document.querySelector('#portrait')
 const darkness = document.querySelector('#darkness')
+const entityDialogue = document.querySelector('#entity-dialogue')
+const entityPortrait = document.querySelector('#entity-portrait')
+const entityVoice = document.querySelector('#entity-voice')
+const entityPortraits = [tallPortrait, heavyPortrait, wiryPortrait]
+let shownEntity = -1
+let voiceEndsAt = 0
 const speaker = document.querySelector('#speaker')
 const line = document.querySelector('#line')
 const advance = document.querySelector('#continue')
@@ -60,9 +70,14 @@ function present() {
 }
 
 function reset(phase = 'date') {
+  if (phase === 'blackout') enableEntityAudio()
   game = createGame()
   game.phase = phase
   beat = 0
+  shownEntity = -1
+  voiceEndsAt = 0
+  entityDialogue.hidden = true
+  entityVoice.textContent = ''
   held.clear()
   stick.reset()
   present()
@@ -127,6 +142,21 @@ if (view) {
 
     const playing = game.phase === 'blackout'
     const prompt = game.action()
+    if (playing && game.entityInside() && shownEntity !== game.encounters) {
+      shownEntity = game.encounters
+      entityPortrait.src = entityPortraits[shownEntity]
+      entityPortrait.alt = entityTypes[shownEntity].name
+      entityDialogue.hidden = false
+      const voice = entityTypes[shownEntity].voice
+      entityVoice.textContent = `[${voice}]`
+      playEntitySound(voice)
+      voiceEndsAt = game.elapsed + 2.7
+    }
+    const showEntityDialogue = playing && game.elapsed < voiceEndsAt
+    if (!showEntityDialogue && !entityDialogue.hidden) {
+      entityDialogue.hidden = true
+      entityVoice.textContent = ''
+    }
     if (previousEncounterCount !== game.encounters) {
       darkness.style.opacity = [0, .38, .7, 1][game.encounters]
       darkness.classList.toggle('blackout-complete', game.encounters >= encounterLimit)
@@ -139,7 +169,7 @@ if (view) {
     if (game.latch > 0) hint = 'Opening the latch… Hold still'
     else if (game.dragging) hint = 'Drag the table toward the entry'
     else if (game.hidden) hint = 'Hidden · Interact to leave the coats'
-    else if (game.barricade && seconds > 0 && !prompt) hint = 'Entry blocked · Get to the balcony latch'
+    else if (game.barricade && game.elapsed < game.entryAt && !prompt) hint = 'Entry blocked · Get to the balcony latch'
     const encounters = game.encounters ? ` · Encounters ${game.encounters}/${encounterLimit}` : ''
     const message = playing ? `${timing} · ${hint}${encounters}` : ''
     if (message !== status.textContent) status.textContent = message

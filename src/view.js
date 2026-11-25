@@ -1,5 +1,5 @@
 import * as T from 'three'
-import { spots } from './game.js'
+import { entityTypes, spots } from './game.js'
 import { createHeroine } from './heroine.js'
 import woodUrl from './assets/wood.webp'
 import plasterUrl from './assets/plaster.webp'
@@ -260,9 +260,9 @@ export function createView(container) {
     scene.add(group)
     const heroine = kind === 'heroine'
     const shadow = kind === 'shadow'
-    const skin = heroine ? '#8d543c' : shadow ? '#2b2137' : '#c48c6d'
-    const top = heroine ? '#f49cae' : shadow ? '#35263e' : '#789680'
-    const jeans = heroine ? '#4278ab' : '#3b364d'
+    const skin = heroine ? '#8d543c' : shadow ? '#08060c' : '#c48c6d'
+    const top = heroine ? '#f49cae' : shadow ? skin : '#789680'
+    const jeans = heroine ? '#4278ab' : shadow ? skin : '#3b364d'
     const hair = heroine ? '#ad573b' : '#302332'
     const legs = []
     for (const x of [-.13, .13]) {
@@ -270,7 +270,7 @@ export function createView(container) {
       leg.position.set(x, .78, 0)
       group.add(leg)
       oval(leg, jeans, 0, -.31, 0, .127, .36, .14)
-      oval(leg, heroine ? '#e889a1' : '#3f283a', 0, -.66, .05, .12, .08, .18)
+      oval(leg, heroine ? '#e889a1' : shadow ? skin : '#3f283a', 0, -.66, .05, .12, .08, .18)
       legs.push(leg)
       oval(group, top, x * 2.05, .94, .01, .082, .26, .092).rotation.z = x * .95
       oval(group, skin, x * 2.43, .74, .03, .07, .096, .075)
@@ -278,7 +278,7 @@ export function createView(container) {
     oval(group, jeans, 0, .73, 0, .236, .17, .176)
     oval(group, top, 0, 1.01, 0, .25, .27, .174)
     oval(group, skin, 0, 1.26, 0, .11, .12, .11)
-    oval(group, hair, 0, 1.48, -.065, .262, .29, .23)
+    if (!shadow) oval(group, hair, 0, 1.48, -.065, .262, .29, .23)
     oval(group, skin, 0, 1.46, .046, .207, .238, .185)
     if (heroine) {
       const fringe = oval(group, '#bd6546', -.095, 1.64, .082, .163, .105, .17)
@@ -294,10 +294,14 @@ export function createView(container) {
       oval(group, '#efcb91', 0, 1.195, .154, .029, .03, .016)
     }
     for (const x of [-.078, .078]) {
-      oval(group, shadow ? '#f45b78' : '#fff1db', x, 1.485, .207, .046, .055, .023)
-      if (!shadow) oval(group, heroine ? '#314f78' : '#312638', x, 1.48, .228, .027, .041, .014)
+      const eye = oval(group, '#fff1db', x, 1.485, .207, .046, shadow ? .023 : .055, .023)
+      if (shadow) {
+        eye.material = new T.MeshBasicMaterial({ color: '#ff213c' })
+        eye.rotation.z = x * -3
+      } else {
+        oval(group, heroine ? '#314f78' : '#312638', x, 1.48, .228, .027, .041, .014)
+      }
     }
-    if (shadow) group.scale.set(1.1, 1.32, 1.1)
     return { group, legs }
   }
   const player = character('heroine')
@@ -305,6 +309,14 @@ export function createView(container) {
   const heroineShadow = contact(room, 0, 0, 1.05, .65, .75)
   const date = character('date')
   const pursuer = character('shadow')
+  const wisps = Array.from({ length: 8 }, () => {
+    const mesh = new T.Mesh(new T.PlaneGeometry(.43, .78), new T.MeshBasicMaterial({
+      color: '#211229', map: shadowMap, transparent: true, depthWrite: false,
+      opacity: .45, side: T.DoubleSide,
+    }))
+    pursuer.group.add(mesh)
+    return mesh
+  })
   date.group.position.set(.3, 0, -2.23)
   date.group.rotation.y = -.3
 
@@ -365,6 +377,15 @@ export function createView(container) {
     heroineShadow.visible = !game.hidden
     actorPose(pursuer, inside ? game.pursuer : { x: 3.83, z: -4.66 }, time)
     if (!inside) pursuer.group.rotation.y = 0
+    const entity = entityTypes[Math.min(game.encounters, entityTypes.length - 1)]
+    pursuer.group.scale.set(...entity.scale)
+    for (const [i, wisp] of wisps.entries()) {
+      const progress = (time * .64 + i / wisps.length) % 1
+      const side = i % 2 === 0 ? -1 : 1
+      wisp.position.set(side * (.13 + progress * .43), .65 + progress * 1.22, Math.sin(i * 2.4) * .21)
+      wisp.rotation.z = -side * (.22 + progress * .59)
+      wisp.material.opacity = Math.sin(progress * Math.PI) * .64
+    }
     labels[2].position.set(game.table.x, 1.42, game.table.z)
     for (const { element, position } of labels) {
       element.hidden = game.phase !== 'blackout'
