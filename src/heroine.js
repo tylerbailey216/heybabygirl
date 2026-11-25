@@ -10,7 +10,8 @@ export function createHeroine(scene, fallback) {
   const material = new T.SpriteMaterial({ alphaTest: .08 })
   const sprite = new T.Sprite(material)
   sprite.center.set(.5, 7 / 360)
-  sprite.scale.set(.9, 1.62, 1)
+  const height = 2.08
+  sprite.scale.set(height * 200 / 360, height, 1)
   sprite.visible = false
   scene.add(sprite)
 

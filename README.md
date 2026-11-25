@@ -23,8 +23,8 @@ npm run preview
 | Action | Keyboard | Touch |
 | --- | --- | --- |
 | Advance dialogue | Enter, Space or E | Tap the response |
-| Move | WASD or arrow keys | Hold the directional pad |
-| Interact | E | Tap the action button |
+| Move | WASD or arrow keys | Drag the thumbstick in any direction |
+| Interact | E | Tap the active Table, Hide, or Latch button |
 | Restart | R | Tap Restart |
 
 After the blackout, approach the table, grab it, and move toward the entry to delay the pursuer. Interact near the hanging coats to hide or emerge. At the balcony, interact with the latch and stay still until it opens. If caught, **Retry blackout** starts a fresh escape attempt. After escaping, **Play again** returns to the date.

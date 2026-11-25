@@ -16,13 +16,12 @@
     <p id="speaker" class="eyebrow"></p><h2 id="line"></h2><button id="continue" type="button"></button>
   </section>
   <div id="touch" hidden>
-    <div class="pad" aria-label="Movement">
-      <button data-move="ArrowUp" aria-label="Move up">↑</button>
-      <button data-move="ArrowLeft" aria-label="Move left">←</button>
-      <button data-move="ArrowDown" aria-label="Move down">↓</button>
-      <button data-move="ArrowRight" aria-label="Move right">→</button>
+    <div id="thumbstick" role="img" aria-label="Movement thumbstick"><span></span></div>
+    <div class="actions" role="group" aria-label="Item actions">
+      <button id="table-action" type="button" disabled>Table</button>
+      <button id="coats-action" type="button" disabled>Hide</button>
+      <button id="latch-action" type="button" disabled>Latch</button>
     </div>
-    <button id="action" type="button">Interact</button>
   </div>
   <footer id="keys"><kbd>WASD</kbd> <kbd>↑↓←→</kbd> Move <kbd>E</kbd> Interact <kbd>R</kbd> Restart</footer>
 </main>

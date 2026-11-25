@@ -1,13 +1,19 @@
 import './style.css'
 import { createGame } from './game.js'
 import { createView } from './view.js'
+import { bindThumbstick } from './thumbstick.js'
 
 const panel = document.querySelector('#panel')
 const speaker = document.querySelector('#speaker')
 const line = document.querySelector('#line')
 const advance = document.querySelector('#continue')
 const touch = document.querySelector('#touch')
-const action = document.querySelector('#action')
+const itemButtons = [
+  { element: document.querySelector('#table-action'), labels: new Map([['Grab dining table', 'Grab table'], ['Let go of table', 'Release table']]), idle: 'Table' },
+  { element: document.querySelector('#coats-action'), labels: new Map([['Hide behind coats', 'Hide'], ['Leave hiding spot', 'Leave coats']]), idle: 'Hide' },
+  { element: document.querySelector('#latch-action'), labels: new Map([['Open balcony latch', 'Open latch']]), idle: 'Latch' },
+]
+const stick = bindThumbstick(document.querySelector('#thumbstick'))
 const status = document.querySelector('#status')
 const hasTouch = matchMedia('(any-pointer: coarse)')
 const dialogue = [
@@ -23,7 +29,6 @@ const endings = {
 let game = createGame()
 let beat = 0
 const held = new Set()
-const pointers = new Map()
 let view
 try {
   view = createView(document.querySelector('#scene'))
@@ -39,6 +44,7 @@ function present() {
   const playing = game.phase === 'blackout'
   panel.hidden = playing
   touch.hidden = !playing || !hasTouch.matches
+  if (touch.hidden) stick.reset()
   if (!playing) {
     const [name, text, button] = endings[game.phase] ?? dialogue[beat]
     speaker.textContent = name
@@ -52,7 +58,7 @@ function reset(phase = 'date') {
   game.phase = phase
   beat = 0
   held.clear()
-  pointers.clear()
+  stick.reset()
   present()
 }
 
@@ -70,7 +76,11 @@ if (view) {
   present()
   advance.addEventListener('click', next)
   document.querySelector('#restart').addEventListener('click', () => reset(game.phase === 'date' ? 'date' : 'blackout'))
-  action.addEventListener('click', () => game.interact())
+  for (const { element, labels } of itemButtons) {
+    element.addEventListener('click', () => {
+      if (labels.has(game.action()) && game.latch <= 0) game.interact()
+    })
+  }
   hasTouch.addEventListener('change', present)
   window.addEventListener('keydown', event => {
     if (event.ctrlKey || event.metaKey || event.altKey) return
@@ -91,28 +101,18 @@ if (view) {
   window.addEventListener('keyup', event => held.delete(event.key.length === 1 ? event.key.toLowerCase() : event.key))
   window.addEventListener('blur', () => {
     held.clear()
-    pointers.clear()
+    stick.reset()
   })
-  for (const button of document.querySelectorAll('[data-move]')) {
-    button.addEventListener('pointerdown', event => {
-      event.preventDefault()
-      button.setPointerCapture(event.pointerId)
-      pointers.set(event.pointerId, button.dataset.move)
-    })
-    for (const type of ['pointerup', 'pointercancel', 'lostpointercapture']) {
-      button.addEventListener(type, event => pointers.delete(event.pointerId))
-    }
-  }
-
-  const pressed = (...keys) => keys.some(key => held.has(key) || [...pointers.values()].includes(key))
+  const pressed = (...keys) => keys.some(key => held.has(key))
   let previousTime = performance.now()
   function frame(now) {
     const dt = Math.min((now - previousTime) / 1000, .05)
     previousTime = now
     const phase = game.phase
-    game.update(dt,
-      Number(pressed('d', 'ArrowRight')) - Number(pressed('a', 'ArrowLeft')),
-      Number(pressed('s', 'ArrowDown')) - Number(pressed('w', 'ArrowUp')))
+    const keyboardX = Number(pressed('d', 'ArrowRight')) - Number(pressed('a', 'ArrowLeft'))
+    const keyboardZ = Number(pressed('s', 'ArrowDown')) - Number(pressed('w', 'ArrowUp'))
+    const usingKeyboard = keyboardX !== 0 || keyboardZ !== 0
+    game.update(dt, usingKeyboard ? keyboardX : stick.x, usingKeyboard ? keyboardZ : stick.z)
     if (phase !== game.phase) {
       present()
       advance.focus()
@@ -129,8 +129,11 @@ if (view) {
     else if (game.barricade && seconds > 0 && !prompt) hint = 'Entry blocked · Get to the balcony latch'
     const message = playing ? `${timing} · ${hint}` : ''
     if (message !== status.textContent) status.textContent = message
-    action.textContent = prompt || 'Interact'
-    action.disabled = !prompt
+    for (const { element, labels, idle } of itemButtons) {
+      const label = labels.get(prompt) ?? idle
+      if (element.textContent !== label) element.textContent = label
+      element.disabled = !labels.has(prompt) || game.latch > 0
+    }
     view.render(game, now / 1000)
     requestAnimationFrame(frame)
   }
