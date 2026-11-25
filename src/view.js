@@ -360,23 +360,28 @@ export function createView(container) {
   function render(game, time) {
     const blackout = game.phase !== 'date'
     const inside = blackout && game.entityInside()
-    ceiling.intensity = blackout ? .12 : 2.05
-    ambient.intensity = blackout ? .63 : 1.18
-    moon.intensity = blackout ? 39 : 15
-    candle.intensity = (blackout ? 29 : 11) + Math.sin(time * 19) * 1.4 + Math.sin(time * 8) * 1.2
+    ceiling.intensity = blackout ? .04 : 2.05
+    ambient.intensity = blackout ? .31 : 1.18
+    moon.intensity = blackout ? 26 : 15
+    candle.intensity = (blackout ? 23 : 11) + Math.sin(time * 19) * 1.4 + Math.sin(time * 8) * 1.2
     flame.scale.y = 1 + Math.sin(time * 16) * .13
     table.position.set(game.table.x, 0, game.table.z)
-    door.rotation.y = inside ? -.86 : 0
+    const burst = inside ? Math.min(1, (game.elapsed - game.entityArrivalAt()) / .28) : 0
+    const swing = 1 - (1 - burst) ** 3 + Math.sin(burst * Math.PI) * .19
+    door.rotation.y = -1.17 * swing
     glass.position.x = game.phase === 'escaped' ? -1.35 : 0
     date.group.visible = !blackout
-    pursuer.group.visible = blackout && (inside || game.elapsed < game.entryAt)
+    pursuer.group.visible = inside
     actorPose(player, game.player, time)
     poseHeroine(game, time)
     heroineShadow.position.x = game.player.x
     heroineShadow.position.z = game.player.z + .06
     heroineShadow.visible = !game.hidden
-    actorPose(pursuer, inside ? game.pursuer : { x: 3.83, z: -4.66 }, time)
-    if (!inside) pursuer.group.rotation.y = 0
+    if (inside) actorPose(pursuer, game.pursuer, time)
+    else {
+      pursuer.group.position.set(game.pursuer.x, 0, game.pursuer.z)
+      pursuer.group.rotation.y = 0
+    }
     const entity = entityTypes[Math.min(game.encounters, entityTypes.length - 1)]
     pursuer.group.scale.set(...entity.scale)
     for (const [i, wisp] of wisps.entries()) {

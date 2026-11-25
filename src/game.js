@@ -11,6 +11,7 @@ export const spots = {
   balcony: { x: 3.7, z: -3.5 },
 }
 const start = { x: 0, z: 0.9 }
+const entryCountdown = 10
 const tableStart = { x: -1.4, z: -1.35 }
 const furniture = [
   { x: 2.3, z: 2.9, w: 4, d: 1.2 },
@@ -22,7 +23,7 @@ export const distance = (a, b) => Math.hypot(a.x - b.x, a.z - b.z)
 export function createGame() {
   const game = {
     phase: 'date', player: { ...start }, table: { ...tableStart },
-    pursuer: { ...spots.entry }, elapsed: 0, entryAt: 16, reappearsAt: 0, encounters: 0,
+    pursuer: { ...spots.entry }, elapsed: 0, entryAt: Infinity, reappearsAt: 0, encounters: 0,
     hidden: false, dragging: false, barricade: false, latch: 0,
   }
 
@@ -104,6 +105,9 @@ export function createGame() {
       game.latch = 0
       const normalizer = Math.max(1, length)
       move(game.player, inputX / normalizer * speed * dt, inputZ / normalizer * speed * dt)
+      if (game.entryAt === Infinity && distance(game.player, start) >= .45) {
+        game.entryAt = game.elapsed + entryCountdown
+      }
       if (game.dragging) {
         game.table.x += game.player.x - x
         game.table.z += game.player.z - z
@@ -148,9 +152,13 @@ export function createGame() {
     }
   }
 
-  function entityInside() {
-    return game.elapsed >= game.entryAt && game.elapsed >= game.reappearsAt
+  function entityArrivalAt() {
+    return Math.max(game.entryAt, game.reappearsAt)
   }
 
-  return Object.assign(game, { action, interact, update, entityInside })
+  function entityInside() {
+    return game.elapsed >= entityArrivalAt()
+  }
+
+  return Object.assign(game, { action, interact, update, entityArrivalAt, entityInside })
 }

@@ -15,9 +15,11 @@ const darkness = document.querySelector('#darkness')
 const entityDialogue = document.querySelector('#entity-dialogue')
 const entityPortrait = document.querySelector('#entity-portrait')
 const entityVoice = document.querySelector('#entity-voice')
+const entitySpeaker = document.querySelector('#entity-speaker')
 const entityPortraits = [tallPortrait, heavyPortrait, wiryPortrait]
 let shownEntity = -1
 let voiceEndsAt = 0
+let wasInside = false
 const entityEntranceBeat = .9
 const speaker = document.querySelector('#speaker')
 const line = document.querySelector('#line')
@@ -33,8 +35,8 @@ const status = document.querySelector('#status')
 const hasTouch = matchMedia('(any-pointer: coarse)')
 const dialogue = [
   [datePortrait, 'Your date', 'I was going to ask if you wanted to stay for dessert.', 'What did you make?'],
-  [datePortrait, 'Your date', 'You hear that? I thought we were the only ones out here.', 'Look toward the balcony'],
-  [heroinePortrait, 'You · Thinking', 'There’s someone outside. Wait… where did you go?', 'Get up'],
+  [datePortrait, 'Your date', 'You hear that? I thought we were the only ones out here.', 'Listen'],
+  [heroinePortrait, 'You · Thinking', 'That came from the front door. Wait… where did you go?', 'Get up'],
 ]
 const endings = {
   caught: [heroinePortrait, 'You · Caught', 'It came back. This time, the light didn’t.', 'Retry blackout'],
@@ -77,6 +79,7 @@ function reset(phase = 'date') {
   beat = 0
   shownEntity = -1
   voiceEndsAt = 0
+  wasInside = false
   entityDialogue.hidden = true
   entityVoice.textContent = ''
   held.clear()
@@ -127,7 +130,7 @@ if (view) {
   })
   const pressed = (...keys) => keys.some(key => held.has(key))
   let previousTime = performance.now()
-  let previousEncounterCount = -1
+  let previousDarkness
   function frame(now) {
     const dt = Math.min((now - previousTime) / 1000, .05)
     previousTime = now
@@ -143,12 +146,14 @@ if (view) {
 
     const playing = game.phase === 'blackout'
     const prompt = game.action()
-    const arrivalAt = Math.max(game.entryAt, game.reappearsAt)
+    const arrivalAt = game.entityArrivalAt()
     const entityInside = playing && game.entityInside()
+    if (entityInside && !wasInside) playEntitySound('Door')
+    wasInside = entityInside
     if (entityInside && game.elapsed >= arrivalAt + entityEntranceBeat && shownEntity !== game.encounters) {
       shownEntity = game.encounters
       entityPortrait.src = entityPortraits[shownEntity]
-      entityPortrait.alt = entityTypes[shownEntity].name
+      entitySpeaker.textContent = entityTypes[shownEntity].name
       entityDialogue.hidden = false
       const voice = entityTypes[shownEntity].voice
       entityVoice.textContent = `[${voice}]`
@@ -160,18 +165,17 @@ if (view) {
       entityDialogue.hidden = true
       entityVoice.textContent = ''
     }
-    if (previousEncounterCount !== game.encounters) {
-      darkness.style.opacity = [0, .38, .7, 1][game.encounters]
+    const opacity = game.phase === 'date' ? 0 : [.32, .55, .76, 1][game.encounters]
+    if (previousDarkness !== opacity) {
+      darkness.style.opacity = opacity
       darkness.classList.toggle('blackout-complete', game.encounters >= encounterLimit)
-      previousEncounterCount = game.encounters
+      previousDarkness = opacity
     }
     const secondsToArrival = Math.ceil(arrivalAt - game.elapsed)
-    let timing = entityInside ? 'It’s inside' : 'It vanished'
-    if (game.elapsed < game.entryAt) {
-      timing = game.elapsed < 6 ? 'The power is out' : 'Something’s at the door'
-    }
-    if (secondsToArrival > 0 && secondsToArrival <= 5) {
-      timing = `${game.encounters ? 'Returns' : 'Entry'} in ${secondsToArrival}s`
+    let timing = 'Move to investigate'
+    if (entityInside) timing = 'It’s inside'
+    else if (Number.isFinite(secondsToArrival)) {
+      timing = `${game.encounters ? 'Returns' : 'Door bursts open'} in ${secondsToArrival}s`
     }
     let hint = prompt || 'Get to the balcony latch'
     if (game.latch > 0) hint = 'Opening the latch… Hold still'

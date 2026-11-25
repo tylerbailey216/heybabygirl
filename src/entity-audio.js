@@ -10,7 +10,8 @@ export function enableEntityAudio() {
 export function playEntitySound(voice) {
   if (context?.state !== 'running') return
   const now = context.currentTime
-  const duration = voice === 'Grunt' ? .38 : voice === 'Hiss' ? .86 : 1.15
+  const door = voice === 'Door'
+  const duration = door ? .32 : voice === 'Grunt' ? .38 : voice === 'Hiss' ? .86 : 1.15
   const length = Math.ceil(context.sampleRate * duration)
   const buffer = context.createBuffer(1, length, context.sampleRate)
   const samples = buffer.getChannelData(0)
@@ -23,12 +24,12 @@ export function playEntitySound(voice) {
   source.buffer = buffer
   const filter = context.createBiquadFilter()
   filter.type = 'bandpass'
-  filter.frequency.setValueAtTime(voice === 'Hiss' ? 3100 : 240, now)
-  filter.frequency.exponentialRampToValueAtTime(voice === 'Hiss' ? 1400 : 105, now + duration)
+  filter.frequency.setValueAtTime(door ? 160 : voice === 'Hiss' ? 3100 : 240, now)
+  filter.frequency.exponentialRampToValueAtTime(door ? 55 : voice === 'Hiss' ? 1400 : 105, now + duration)
   filter.Q.value = voice === 'Hiss' ? .65 : 1.1
   const volume = context.createGain()
   volume.gain.setValueAtTime(.001, now)
-  volume.gain.linearRampToValueAtTime(voice === 'Hiss' ? .17 : .3, now + .07)
+  volume.gain.linearRampToValueAtTime(voice === 'Hiss' ? .17 : .3, now + (door ? .012 : .07))
   volume.gain.exponentialRampToValueAtTime(.001, now + duration)
   source.connect(filter).connect(volume).connect(context.destination)
   source.start()

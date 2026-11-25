@@ -13,16 +13,19 @@
   <header><div><p class="eyebrow">BLACKOUT DATE</p><h1>Hey Baby Girl<span>.</span></h1></div><button id="restart" type="button" aria-label="Restart game">Restart</button></header>
   <div id="status" aria-live="polite"></div>
   <div id="markers" aria-hidden="true"></div>
-  <div id="dialogue">
-    <img id="portrait" alt="" hidden>
-    <section id="panel" aria-live="polite">
+  <div id="dialogue" class="dialogue-layer">
+    <img id="portrait" class="dialogue-portrait" alt="" hidden>
+    <section id="panel" class="dialogue-panel" aria-live="polite">
       <p id="speaker" class="eyebrow"></p><h2 id="line"></h2><button id="continue" type="button"></button>
     </section>
   </div>
-  <aside id="entity-dialogue" hidden>
-    <img id="entity-portrait" alt="">
-    <p id="entity-voice" role="status"></p>
-  </aside>
+  <div id="entity-dialogue" class="dialogue-layer" hidden>
+    <img id="entity-portrait" class="dialogue-portrait" alt="">
+    <section class="dialogue-panel entity-panel" aria-live="polite">
+      <p id="entity-speaker" class="eyebrow"></p>
+      <h2 id="entity-voice"></h2>
+    </section>
+  </div>
   <div id="touch" hidden>
     <div id="thumbstick" role="img" aria-label="Movement thumbstick"><span></span></div>
     <div class="actions" role="group" aria-label="Item actions">
