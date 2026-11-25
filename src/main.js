@@ -1,9 +1,13 @@
 import './style.css'
-import { createGame } from './game.js'
+import { createGame, encounterLimit } from './game.js'
 import { createView } from './view.js'
 import { bindThumbstick } from './thumbstick.js'
+import heroinePortrait from './assets/heroine-portrait.webp'
+import datePortrait from './assets/date-portrait.webp'
 
-const panel = document.querySelector('#panel')
+const dialogueLayer = document.querySelector('#dialogue')
+const portrait = document.querySelector('#portrait')
+const darkness = document.querySelector('#darkness')
 const speaker = document.querySelector('#speaker')
 const line = document.querySelector('#line')
 const advance = document.querySelector('#continue')
@@ -17,13 +21,13 @@ const stick = bindThumbstick(document.querySelector('#thumbstick'))
 const status = document.querySelector('#status')
 const hasTouch = matchMedia('(any-pointer: coarse)')
 const dialogue = [
-  ['Your date', 'I was going to ask if you wanted to stay for dessert.', 'What did you make?'],
-  ['Your date', 'You hear that? I thought we were the only ones out here.', 'Look toward the balcony'],
-  ['You', 'There’s someone outside. Wait… where did you go?', 'Get up'],
+  [datePortrait, 'Your date', 'I was going to ask if you wanted to stay for dessert.', 'What did you make?'],
+  [datePortrait, 'Your date', 'You hear that? I thought we were the only ones out here.', 'Look toward the balcony'],
+  [heroinePortrait, 'You · Thinking', 'There’s someone outside. Wait… where did you go?', 'Get up'],
 ]
 const endings = {
-  caught: ['Caught', 'Something moved in the dark. Then it was right behind you.', 'Retry blackout'],
-  escaped: ['Escaped', 'The latch gives. You step into the rain and take the fire stairs down.', 'Play again'],
+  caught: [heroinePortrait, 'You · Caught', 'It came back. This time, the light didn’t.', 'Retry blackout'],
+  escaped: [heroinePortrait, 'You · Escaped', 'The latch gave. I’m taking the fire stairs down.', 'Play again'],
 }
 
 let game = createGame()
@@ -42,11 +46,13 @@ try {
 
 function present() {
   const playing = game.phase === 'blackout'
-  panel.hidden = playing
+  dialogueLayer.hidden = playing
   touch.hidden = !playing || !hasTouch.matches
   if (touch.hidden) stick.reset()
   if (!playing) {
-    const [name, text, button] = endings[game.phase] ?? dialogue[beat]
+    const [image, name, text, button] = endings[game.phase] ?? dialogue[beat]
+    portrait.src = image
+    portrait.hidden = false
     speaker.textContent = name
     line.textContent = text
     advance.textContent = button
@@ -105,6 +111,7 @@ if (view) {
   })
   const pressed = (...keys) => keys.some(key => held.has(key))
   let previousTime = performance.now()
+  let previousEncounterCount = -1
   function frame(now) {
     const dt = Math.min((now - previousTime) / 1000, .05)
     previousTime = now
@@ -120,14 +127,21 @@ if (view) {
 
     const playing = game.phase === 'blackout'
     const prompt = game.action()
-    const seconds = Math.max(0, Math.ceil(game.entryAt - game.elapsed))
-    const timing = seconds > 0 ? `Entry in ${seconds}s` : 'It’s inside'
+    if (previousEncounterCount !== game.encounters) {
+      darkness.style.opacity = [0, .38, .7, 1][game.encounters]
+      darkness.classList.toggle('blackout-complete', game.encounters >= encounterLimit)
+      previousEncounterCount = game.encounters
+    }
+    const timing = game.elapsed < game.entryAt
+      ? (game.elapsed < 6 ? 'The power is out' : 'Something’s at the door')
+      : game.entityInside() ? 'It’s inside' : 'It vanished'
     let hint = prompt || 'Get to the balcony latch'
     if (game.latch > 0) hint = 'Opening the latch… Hold still'
     else if (game.dragging) hint = 'Drag the table toward the entry'
     else if (game.hidden) hint = 'Hidden · Interact to leave the coats'
     else if (game.barricade && seconds > 0 && !prompt) hint = 'Entry blocked · Get to the balcony latch'
-    const message = playing ? `${timing} · ${hint}` : ''
+    const encounters = game.encounters ? ` · Encounters ${game.encounters}/${encounterLimit}` : ''
+    const message = playing ? `${timing} · ${hint}${encounters}` : ''
     if (message !== status.textContent) status.textContent = message
     for (const { element, labels, idle } of itemButtons) {
       const label = labels.get(prompt) ?? idle

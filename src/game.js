@@ -1,3 +1,5 @@
+export const encounterLimit = 3
+
 export const spots = {
   entry: { x: -5.2, z: -2.4 },
   coats: { x: -4.5, z: 0.1 },
@@ -15,7 +17,7 @@ export const distance = (a, b) => Math.hypot(a.x - b.x, a.z - b.z)
 export function createGame() {
   const game = {
     phase: 'date', player: { ...start }, table: { ...tableStart },
-    pursuer: { ...spots.entry }, elapsed: 0, entryAt: 9,
+    pursuer: { ...spots.entry }, elapsed: 0, entryAt: 16, reappearsAt: 0, encounters: 0,
     hidden: false, dragging: false, barricade: false, latch: 0,
   }
 
@@ -110,7 +112,7 @@ export function createGame() {
         }
       }
     }
-    if (game.elapsed >= game.entryAt) {
+    if (entityInside()) {
       const patrol = game.elapsed % 10 < 5 ? { x: 0, z: 1.4 } : { x: 2.85, z: -2.1 }
       const target = game.hidden ? patrol : game.player
       repath -= dt
@@ -120,12 +122,18 @@ export function createGame() {
       }
       const range = distance(game.pursuer, waypoint)
       if (range > 0.01) {
-        const amount = Math.min(range, dt * 2.45) / range
+        const amount = Math.min(range, dt * (game.hidden ? .72 : 1.13)) / range
         move(game.pursuer, (waypoint.x - game.pursuer.x) * amount, (waypoint.z - game.pursuer.z) * amount)
       }
       if (!game.hidden && distance(game.player, game.pursuer) < 0.67) {
-        game.phase = 'caught'
-        return
+        game.encounters++
+        if (game.encounters >= encounterLimit) {
+          game.phase = 'caught'
+          return
+        }
+        game.reappearsAt = game.elapsed + 6
+        Object.assign(game.pursuer, game.barricade ? { x: -4.9, z: -1.45 } : spots.entry)
+        waypoint = undefined
       }
     }
     if (game.latch > 0) {
@@ -134,5 +142,9 @@ export function createGame() {
     }
   }
 
-  return Object.assign(game, { action, interact, update })
+  function entityInside() {
+    return game.elapsed >= game.entryAt && game.elapsed >= game.reappearsAt
+  }
+
+  return Object.assign(game, { action, interact, update, entityInside })
 }

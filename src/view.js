@@ -347,7 +347,7 @@ export function createView(container) {
   }
   function render(game, time) {
     const blackout = game.phase !== 'date'
-    const inside = blackout && game.elapsed >= game.entryAt
+    const inside = blackout && game.entityInside()
     ceiling.intensity = blackout ? .12 : 2.05
     ambient.intensity = blackout ? .63 : 1.18
     moon.intensity = blackout ? 39 : 15
@@ -357,7 +357,7 @@ export function createView(container) {
     door.rotation.y = inside ? -.86 : 0
     glass.position.x = game.phase === 'escaped' ? -1.35 : 0
     date.group.visible = !blackout
-    pursuer.group.visible = blackout
+    pursuer.group.visible = blackout && (inside || game.elapsed < game.entryAt)
     actorPose(player, game.player, time)
     poseHeroine(game, time)
     heroineShadow.position.x = game.player.x

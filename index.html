@@ -9,12 +9,16 @@
 <body>
 <main id="game" aria-label="Hey Baby Girl">
   <div id="scene" aria-hidden="true"></div>
+  <div id="darkness" aria-hidden="true"></div>
   <header><div><p class="eyebrow">BLACKOUT DATE</p><h1>Hey Baby Girl<span>.</span></h1></div><button id="restart" type="button" aria-label="Restart game">Restart</button></header>
   <div id="status" aria-live="polite"></div>
   <div id="markers" aria-hidden="true"></div>
-  <section id="panel" aria-live="polite">
-    <p id="speaker" class="eyebrow"></p><h2 id="line"></h2><button id="continue" type="button"></button>
-  </section>
+  <div id="dialogue">
+    <img id="portrait" alt="" hidden>
+    <section id="panel" aria-live="polite">
+      <p id="speaker" class="eyebrow"></p><h2 id="line"></h2><button id="continue" type="button"></button>
+    </section>
+  </div>
   <div id="touch" hidden>
     <div id="thumbstick" role="img" aria-label="Movement thumbstick"><span></span></div>
     <div class="actions" role="group" aria-label="Item actions">
