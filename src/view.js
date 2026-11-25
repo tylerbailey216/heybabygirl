@@ -1,5 +1,5 @@
 import * as T from 'three'
-import { descentDelays, entityTypes, spots } from './game.js'
+import { descentDelays, entityTypes, phoneRushDuration, spots, streetProps } from './game.js'
 import { createHeroine } from './heroine.js'
 import woodUrl from './assets/wood.webp'
 import plasterUrl from './assets/plaster.webp'
@@ -369,7 +369,37 @@ export function createView(container) {
     color: '#9cbbef', opacity: .48, transparent: true, depthWrite: false,
   }))
   outsideRain.frustumCulled = false
-  fireEscape.add(outsideRain)
+  scene.add(outsideRain)
+
+  const phoneStreet = new T.Group()
+  phoneStreet.visible = false
+  scene.add(phoneStreet)
+  box(phoneStreet, '#23283a', 0, -.13, .15, 8.2, .25, 13.2, false)
+  box(phoneStreet, '#323747', 0, .025, -1.85, 8.2, .09, .35)
+  box(phoneStreet, '#1a1d2c', 0, .09, -4.45, 8.2, .22, 5, false)
+  for (let i = 0; i < 12; i++) {
+    box(phoneStreet, '#414657', -3.8 + i * .69, .078, -2.03, .66, .06, .19, false)
+    box(phoneStreet, '#303649', -3.8 + i * .69, 1.25, -6.25, .65, 2.65, .2, false)
+  }
+  for (const [index, prop] of streetProps.entries()) {
+    if (index === 0) {
+      shape(phoneStreet, new T.CylinderGeometry(.31, .265, .78, 12), '#454b5b', prop.x, .39, prop.z)
+      shape(phoneStreet, new T.CylinderGeometry(.365, .35, .085, 12), '#596072', prop.x, .81, prop.z)
+    } else {
+      box(phoneStreet, '#4a4853', prop.x, .27, prop.z, prop.w, .54, prop.d)
+      box(phoneStreet, '#5a596a', prop.x, .57, prop.z, prop.w + .045, .065, prop.d + .045)
+    }
+  }
+  const phoneLight = new T.PointLight('#88b9ff', 7.8, 2.65, 2)
+  phoneStreet.add(phoneLight)
+  const phonePool = new T.Mesh(new T.PlaneGeometry(3.8, 3.2), new T.MeshBasicMaterial({
+    color: '#355f9b', map: shadowMap, transparent: true, opacity: .42, depthWrite: false,
+  }))
+  phonePool.rotation.x = -Math.PI / 2
+  phoneStreet.add(phonePool)
+  const rushLight = new T.PointLight('#446aa9', 18, 9, 2)
+  rushLight.position.set(-2, 2.3, -2.8)
+  phoneStreet.add(rushLight)
 
   const markers = document.querySelector('#markers')
   const labels = [
@@ -421,12 +451,24 @@ export function createView(container) {
   }
 
   function render(game, time, dateOffscreen) {
-    if (game.phase === 'street' || game.phase === 'complete') return
+    if (game.phase === 'street' || game.phase === 'complete' || game.phase === 'phoneCaught') return
     const blackout = game.phase !== 'date'
     const cinematic = game.phase === 'descent'
     const outside = game.phase === 'fireEscape' || cinematic
+    const phoneDark = game.phase === 'phoneDark'
+    const phoneRush = game.phase === 'phoneRush'
+    const trap = phoneDark || phoneRush
     const pan = cinematic && !reducedMotion.matches ? game.cinematicElapsed * .085 : 0
-    if (cinematic) {
+    if (phoneDark) {
+      const { x, z } = game.player
+      camera.position.set(x, 10.5, z + 6.5)
+      camera.lookAt(x, .35, z)
+      camera.zoom = 1.44
+    } else if (phoneRush) {
+      camera.position.set(0, 2.15, 5.65)
+      camera.lookAt(0, .63, -1.2)
+      camera.zoom = 1.8
+    } else if (cinematic) {
       camera.position.set(pan, 7.8, 11.4)
       camera.lookAt(pan, .16, 0)
       camera.zoom = 1.1
@@ -438,11 +480,21 @@ export function createView(container) {
     camera.updateProjectionMatrix()
     const inside = game.phase === 'blackout' && game.entityInside()
     const ground = outside ? floorHeight(game.player.x) : 0
-    room.visible = !outside
+    room.visible = !outside && !trap
     fireEscape.visible = outside
+    phoneStreet.visible = trap
+    outsideRain.visible = outside || trap
+    outsideRain.material.opacity = phoneDark ? .14 : phoneRush ? .32 : .48
+    phoneLight.visible = phoneDark
+    phonePool.visible = phoneDark
+    rushLight.visible = phoneRush
+    if (phoneDark) {
+      phoneLight.position.set(game.player.x, 1.03, game.player.z - .22)
+      phonePool.position.set(game.player.x, .008, game.player.z)
+    }
     ceiling.intensity = blackout ? .04 : 2.05
-    ambient.intensity = blackout ? .31 : 1.18
-    moon.intensity = blackout ? 26 : 15
+    ambient.intensity = trap ? .022 : blackout ? .31 : 1.18
+    moon.intensity = trap ? 0 : blackout ? 26 : 15
     const candleLit = !blackout || !game.penalties.darkness
     flame.visible = candleLit
     candle.intensity = candleLit ? (blackout ? 23 : 11) + Math.sin(time * 19) * 1.4 + Math.sin(time * 8) * 1.2 : 0
@@ -453,20 +505,32 @@ export function createView(container) {
     door.rotation.y = -1.17 * swing
     glass.position.x = outside ? -1.35 : 0
     date.group.visible = !blackout && !dateOffscreen
-    pursuer.group.visible = inside
+    pursuer.group.visible = inside || phoneRush
     actorPose(player, game.player, time)
     player.group.position.y = ground
     poseHeroine(game, time, ground)
     heroineShadow.position.x = game.player.x
     heroineShadow.position.z = game.player.z + .06
     heroineShadow.visible = !game.hidden
-    if (inside) actorPose(pursuer, game.pursuer, time)
+    if (phoneRush) {
+      const progress = Math.min(1, game.phoneElapsed / phoneRushDuration)
+      const dash = progress ** 1.45
+      const scramble = Math.sin(progress * 34) * (reducedMotion.matches ? 0 : .26)
+      actorPose(pursuer, { x: scramble, z: -5.2 + dash * 8.4 }, time * 2.15)
+      pursuer.group.rotation.y = 0
+      pursuer.group.rotation.x = -.35
+      pursuer.group.scale.set(1.17, .75, 1.35)
+      poseWisps(pursuer, time * 2.1)
+    } else if (inside) actorPose(pursuer, game.pursuer, time)
     else {
       pursuer.group.position.set(game.pursuer.x, 0, game.pursuer.z)
       pursuer.group.rotation.y = 0
     }
     const entity = entityTypes[Math.min(game.encounters, entityTypes.length - 1)]
-    pursuer.group.scale.set(...entity.scale)
+    if (!phoneRush) {
+      pursuer.group.scale.set(...entity.scale)
+      pursuer.group.rotation.x = 0
+    }
     if (inside) poseWisps(pursuer, time)
     procession.forEach((actor, index) => {
       const walkTime = game.cinematicElapsed - descentDelays[index]
@@ -498,10 +562,12 @@ export function createView(container) {
     if (outside) {
       glow.visible = !cinematic
       glow.material.opacity = .49 + Math.sin(time * 3.5) * .19
+    }
+    if (outsideRain.visible) {
       for (let i = 0; i < outsideDrops.length / 6; i++) {
         const x = ((i * .61803399) % 1) * 12 - 6
         const y = 3.4 - ((i * .387 + time * (.66 + i % 4 * .12)) % 1) * 6
-        const z = ((i * .733) % 1) * 3.8 - 1.15
+        const z = ((i * .733) % 1) * (trap ? 10 : 3.8) - (trap ? 6 : 1.15)
         outsideDrops.set([x, y, z, x + .055, y + .21, z], i * 6)
       }
       outsideRainGeometry.attributes.position.needsUpdate = true

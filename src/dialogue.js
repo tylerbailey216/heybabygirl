@@ -55,14 +55,14 @@ export const streetDialogue = [
     speaker: 'Street level',
     text: 'Your phone vibrates. The street looks empty.',
     options: [
-      { label: 'Check the phone' },
-      { label: 'Call out for him', setback: 'Footsteps stopped behind me. Something had heard my voice.' },
+      { label: 'Check the phone', trap: true },
+      { label: 'Leave the phone dark' },
     ],
   },
   {
     character: 'date',
-    speaker: 'Your date · Text message',
-    text: '“I’m downstairs. Whatever you hear, don’t answer it.”',
+    speaker: 'Your date’s voice · From above',
+    text: '“Hey, baby girl. Look at me.”',
     options: [
       { label: 'Answer the voice', setback: 'It answered in his voice. Then the streetlights went out.' },
       { label: 'Look up without answering' },

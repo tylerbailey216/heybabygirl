@@ -50,7 +50,7 @@ export function createHeroine(scene, fallback) {
     const dx = player.x - previous.x
     const dz = player.z - previous.y
     previous.set(player.x, player.z)
-    const moving = (phase === 'blackout' || phase === 'fireEscape') && !game.hidden && Math.hypot(dx, dz) > .0001
+    const moving = (phase === 'blackout' || phase === 'fireEscape' || phase === 'phoneDark') && !game.hidden && Math.hypot(dx, dz) > .0001
     if (moving) {
       walkStarted ??= time
       row = Math.abs(dx) > Math.abs(dz) ? 1 : dz < 0 ? 2 : 0
@@ -63,13 +63,13 @@ export function createHeroine(scene, fallback) {
     atlas.repeat.set((mirrored ? -1 : 1) / columns, 1 / rows)
     atlas.offset.set((frame + Number(mirrored)) / columns, (rows - 1 - row) / rows)
     sprite.position.set(player.x, ground + .02, player.z)
-    const visible = !game.hidden && phase !== 'descent'
+    const visible = !game.hidden && phase !== 'descent' && phase !== 'phoneRush'
     sprite.visible = ready && visible
     fallback.visible = !ready && visible
 
     if (phase === 'date') {
       material.color.copy(dateLight)
-    } else if (phase === 'fireEscape' || phase === 'landing') {
+    } else if (phase === 'fireEscape' || phase === 'phoneDark') {
       material.color.copy(moonLight)
     } else {
       const candle = Math.max(0, 1 - Math.hypot(player.x - table.x, player.z - table.z) / 5)

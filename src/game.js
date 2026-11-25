@@ -7,6 +7,12 @@ export const encounterLimit = entityTypes.length
 export const descentFadeAt = 7.7
 export const descentDuration = 9.3
 export const descentDelays = [0, 1.9, 2.8, 3.7]
+export const phoneDarkDuration = 3.2
+export const phoneRushDuration = 1.45
+export const streetProps = [
+  { x: -1.9, z: -.95, w: .65, d: .6 },
+  { x: 1.75, z: -.65, w: .72, d: .7 },
+]
 
 export const spots = {
   entry: { x: -5.2, z: -2.4 },
@@ -32,7 +38,7 @@ export function createGame(setbacks = {}) {
     phase: 'date', penalties, player: { ...start }, table: { ...tableStart },
     pursuer: { ...spots.entry }, elapsed: 0, entryAt: Infinity, reappearsAt: 0, encounters: 0,
     hidden: false, dragging: false, barricade: false, latch: 0,
-    hasPin: false, examinedLatch: false, phoneRead: false, cinematicElapsed: 0,
+    hasPin: false, examinedLatch: false, heardVoice: false, cinematicElapsed: 0, phoneElapsed: 0,
   }
 
   function clear(x, z, actor) {
@@ -53,7 +59,7 @@ export function createGame(setbacks = {}) {
     if (game.phase === 'fireEscape') {
       return distance(game.player, spots.landing) < .85 ? 'Step onto street' : ''
     }
-    if (game.phase === 'street') return game.phoneRead ? 'Look up' : 'Check phone'
+    if (game.phase === 'street') return game.heardVoice ? 'Look up' : 'Listen'
     if (game.phase !== 'blackout') return ''
     if (game.hidden) return 'Leave hiding spot'
     if (game.dragging) return 'Let go of table'
@@ -88,11 +94,24 @@ export function createGame(setbacks = {}) {
       case 'Check deadbolt': triggerBreach(); break
       case 'Open balcony latch': game.latch ||= 2.5 + penalties.latch; break
       case 'Step onto street': game.phase = 'street'; break
-      case 'Check phone': game.phoneRead = true; break
+      case 'Listen': game.heardVoice = true; break
       case 'Look up': game.phase = 'descent'; break
       case 'Hide behind coats': game.hidden = true; game.latch = 0; break
       case 'Grab dining table': game.dragging = true; break
     }
+  }
+
+  function beginPhoneTrap() {
+    if (game.phase !== 'street' || game.heardVoice) return
+    game.phase = 'phoneDark'
+    game.phoneElapsed = 0
+    Object.assign(game.player, { x: 0, z: .35 })
+  }
+
+  function retryPhoneTrap() {
+    if (game.phase !== 'phoneCaught') return
+    game.phoneElapsed = 0
+    game.phase = 'street'
   }
 
   // Use a small navigation grid so the pursuer can go around furniture.
@@ -131,6 +150,26 @@ export function createGame(setbacks = {}) {
     }
     const length = Math.hypot(inputX, inputZ)
     const normalizer = Math.max(1, length)
+    if (game.phase === 'phoneDark') {
+      game.phoneElapsed += dt
+      const step = 1.6 * dt / normalizer
+      const { player } = game
+      const open = (x, z) => Math.abs(x) <= 2.8 && z >= -1.55 && z <= 2
+        && !streetProps.some(prop => Math.abs(x - prop.x) < prop.w / 2 + .22
+          && Math.abs(z - prop.z) < prop.d / 2 + .22)
+      if (open(player.x + inputX * step, player.z)) player.x += inputX * step
+      if (open(player.x, player.z + inputZ * step)) player.z += inputZ * step
+      if (game.phoneElapsed >= phoneDarkDuration) {
+        game.phase = 'phoneRush'
+        game.phoneElapsed -= phoneDarkDuration
+      }
+      return
+    }
+    if (game.phase === 'phoneRush') {
+      game.phoneElapsed += dt
+      if (game.phoneElapsed >= phoneRushDuration) game.phase = 'phoneCaught'
+      return
+    }
     if (game.phase === 'fireEscape') {
       const step = 1.55 * dt / normalizer
       game.player.x = Math.max(-5.12, Math.min(5.12, game.player.x + inputX * step))
@@ -200,5 +239,5 @@ export function createGame(setbacks = {}) {
     return game.elapsed >= entityArrivalAt()
   }
 
-  return Object.assign(game, { action, interact, update, entityArrivalAt, entityInside })
+  return Object.assign(game, { action, interact, update, entityArrivalAt, entityInside, beginPhoneTrap, retryPhoneTrap })
 }
