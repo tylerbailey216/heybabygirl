@@ -1,5 +1,5 @@
 import * as T from 'three'
-import { descentDelays, entityTypes, guestDepartureTimes, partyDuration, phoneRushDuration, spots, streetIntersection, streetLightFade, streetProps } from './game.js'
+import { descentDelays, entityTypes, guestDepartureTimes, partyDuration, phoneRushDuration, returnReachAt, spots, streetIntersection, streetLightFade, streetProps } from './game.js'
 import { createHeroine } from './heroine.js'
 import woodUrl from './assets/wood.webp'
 import plasterUrl from './assets/plaster.webp'
@@ -265,6 +265,7 @@ export function createView(container) {
     const jeans = heroine ? '#4278ab' : shadow ? skin : '#3b364d'
     const hair = heroine ? '#ad573b' : palette.hair ?? '#302332'
     const legs = []
+    const arms = []
     for (const x of [-.13, .13]) {
       const leg = new T.Group()
       leg.position.set(x, .78, 0)
@@ -272,8 +273,10 @@ export function createView(container) {
       oval(leg, jeans, 0, -.31, 0, .127, .36, .14)
       oval(leg, heroine ? '#e889a1' : shadow ? skin : '#3f283a', 0, -.66, .05, .12, .08, .18)
       legs.push(leg)
-      oval(group, top, x * 2.05, .94, .01, .082, .26, .092).rotation.z = x * .95
-      oval(group, skin, x * 2.43, .74, .03, .07, .096, .075)
+      const arm = oval(group, top, x * 2.05, .94, .01, .082, .26, .092)
+      arm.rotation.z = x * .95
+      const hand = oval(group, skin, x * 2.43, .74, .03, .07, .096, .075)
+      arms.push({ arm, hand })
     }
     oval(group, jeans, 0, .73, 0, .236, .17, .176)
     oval(group, top, 0, 1.01, 0, .25, .27, .174)
@@ -302,7 +305,7 @@ export function createView(container) {
         oval(group, heroine ? '#314f78' : '#312638', x, 1.48, .228, .027, .041, .014)
       }
     }
-    return { group, legs }
+    return { group, legs, arms }
   }
   const player = character('heroine')
   const poseHeroine = createHeroine(scene, player.group)
@@ -450,6 +453,7 @@ export function createView(container) {
     ['Dining table', 0, 1.2, 0],
     ['Balcony latch', spots.balcony.x, 2.1, spots.balcony.z],
     ['Sideboard', spots.drawer.x, 1.24, -3.3],
+    ['Apartment', spots.returnDoor.x, 1.4, -.6],
     ['Landing', spots.landing.x, floorHeight(spots.landing.x) + .83, 0],
   ].map(([name, x, y, z]) => {
     const element = document.createElement('span')
@@ -492,14 +496,47 @@ export function createView(container) {
     }
   }
 
+  let invertedRoom = false
+  const nightmareMaterials = new Map()
+  const roomSurfaces = []
+  room.traverse(mesh => {
+    const material = mesh.material
+    if (!mesh.isMesh || !(material?.isMeshToonMaterial || material?.isMeshStandardMaterial)) return
+    roomSurfaces.push({ mesh, original: material })
+  })
+
+  function setRoomInverted(active) {
+    if (invertedRoom === active) return
+    invertedRoom = active
+    for (const { mesh, original } of roomSurfaces) {
+      if (!active) {
+        mesh.material = original
+        continue
+      }
+      if (!nightmareMaterials.has(original)) {
+        const inverted = original.clone()
+        inverted.onBeforeCompile = shader => {
+          shader.fragmentShader = shader.fragmentShader.replace(
+            '#include <map_fragment>',
+            '#include <map_fragment>\n diffuseColor.rgb = (vec3(1.0) - diffuseColor.rgb) * vec3(0.44, 0.55, 0.72);',
+          )
+        }
+        nightmareMaterials.set(original, inverted)
+      }
+      mesh.material = nightmareMaterials.get(original)
+    }
+  }
+
   function render(game, time, dateOffscreen) {
-    if (game.phase === 'street' || game.phase === 'complete' || game.phase === 'phoneCaught') return
+    if (game.phase === 'street' || game.phase === 'complete' || game.phase === 'phoneCaught' || game.phase === 'returnCaught') return
     const party = game.phase === 'party'
     const sip = game.phase === 'sip'
     const waking = game.phase === 'waking'
+    const returning = game.phase === 'returnNightmare'
+    setRoomInverted(returning)
     const partyScene = party || sip || game.phase === 'date'
     const blackout = !partyScene
-    const dreaming = waking || game.phase === 'blackout'
+    const dreaming = waking || returning || game.phase === 'blackout'
     const night = party ? Math.min(1, game.introElapsed / partyDuration) : 1
     const cinematic = game.phase === 'descent'
     const outside = game.phase === 'fireEscape' || cinematic
@@ -511,7 +548,11 @@ export function createView(container) {
     const streetChase = streetRun || streetSafe
     const trap = phoneDark || phoneRush || streetDazed || streetChase
     const pan = cinematic && !reducedMotion.matches ? game.cinematicElapsed * .085 : 0
-    if (streetChase) {
+    if (returning) {
+      camera.position.set(3.05, 7.4, 5.3)
+      camera.lookAt(2.65, .65, -1.9)
+      camera.zoom = reducedMotion.matches ? 1.49 : 1.42 + Math.min(.22, game.cinematicElapsed * .05)
+    } else if (streetChase) {
       const { x, z } = game.player
       const lead = Math.min(x + 1.65, streetIntersection.x - .25)
       camera.position.set(lead, 10.8, z + 6.7)
@@ -565,7 +606,7 @@ export function createView(container) {
     partyLight.intensity = partyScene ? (1 - night * .78) * (18 + Math.sin(time * 4.4) * 4) : 0
     dreamLight.intensity = dreaming ? 8 + Math.sin(time * 2.8) * 1.45 : 0
     partyFill.intensity = partyScene ? (1 - night * .7) * (14 + Math.sin(time * 3.2 + 1) * 3) : 0
-    const candleLit = (party || !game.penalties.darkness)
+    const candleLit = !returning && (party || !game.penalties.darkness)
     flame.visible = candleLit
     candle.intensity = candleLit ? (blackout ? 23 : 11) + Math.sin(time * 19) * 1.4 + Math.sin(time * 8) * 1.2 : 0
     flame.scale.y = 1 + Math.sin(time * 16) * .13
@@ -598,14 +639,27 @@ export function createView(container) {
       drink.position.set(.26 - lift * .18, 1.02 + lift * .5, 1.18)
       drink.rotation.z = -.21 * lift
     }
-    pursuer.group.visible = inside || phoneRush || streetRun
+    pursuer.group.visible = inside || phoneRush || streetRun || returning
     actorPose(player, game.player, time)
     player.group.position.y = ground
     poseHeroine(game, time, ground)
     heroineShadow.position.x = game.player.x
     heroineShadow.position.z = game.player.z + .06
     heroineShadow.visible = !game.hidden
-    if (phoneRush) {
+    let reach = 0
+    if (returning) {
+      const timeInShot = game.cinematicElapsed
+      const approach = T.MathUtils.smoothstep(timeInShot, .32, returnReachAt)
+      const lurch = reducedMotion.matches ? 0 : Math.sin(timeInShot * 7.4) * .085 * Math.sin(approach * Math.PI)
+      const x = T.MathUtils.lerp(1.12, game.player.x - .27, approach) + lurch
+      const z = T.MathUtils.lerp(-.55, game.player.z + .41, approach)
+      actorPose(pursuer, { x, z }, time * 1.16)
+      pursuer.group.rotation.y = Math.atan2(game.player.x - x, game.player.z - z)
+      reach = T.MathUtils.smoothstep(timeInShot, returnReachAt - 1.1, returnReachAt + .23)
+      pursuer.group.scale.set(1.17 + reach * .19, 1.35 + reach * .08, 1.2)
+      pursuer.group.rotation.x = -.09 - reach * .19
+      poseWisps(pursuer, time * 1.19)
+    } else if (phoneRush) {
       const progress = Math.min(1, game.phoneElapsed / phoneRushDuration)
       const dash = progress ** 1.45
       const scramble = Math.sin(progress * 34) * (reducedMotion.matches ? 0 : .26)
@@ -620,9 +674,16 @@ export function createView(container) {
       pursuer.group.rotation.y = 0
     }
     const entity = entityTypes[Math.min(game.encounters, entityTypes.length - 1)]
-    if (!phoneRush) {
+    if (!phoneRush && !returning) {
       pursuer.group.scale.set(...(streetRun ? [1.12, .96, 1.2] : entity.scale))
       pursuer.group.rotation.x = streetRun ? -.17 : 0
+    }
+    for (const [index, { arm, hand }] of pursuer.arms.entries()) {
+      const side = index === 0 ? -1 : 1
+      arm.rotation.x = -1.09 * reach
+      arm.rotation.z = side * (.1235 - reach * .67)
+      arm.scale.y = 1 + reach * .55
+      hand.position.set(side * (.3159 - reach * .12), .74 + reach * .04, .03 + reach * .34)
     }
     if (inside || streetRun) poseWisps(pursuer, time)
     procession.forEach((actor, index) => {
@@ -640,7 +701,7 @@ export function createView(container) {
     })
     labels[2].position.set(game.table.x, 1.42, game.table.z)
     for (const [index, { element, position }] of labels.entries()) {
-      element.hidden = index === labels.length - 1 ? game.phase !== 'fireEscape' : game.phase !== 'blackout'
+      element.hidden = index >= labels.length - 2 ? game.phase !== 'fireEscape' : game.phase !== 'blackout'
       const projected = position.clone().project(camera)
       element.style.left = `${(projected.x + 1) * 50}%`
       element.style.top = `${(1 - projected.y) * 50}%`

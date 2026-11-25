@@ -1,5 +1,5 @@
 import './style.css'
-import { createGame, descentDuration, descentFadeAt, encounterLimit, entityTypes, phoneRushDuration, sipDuration, streetLightFade, streetWakeSeconds, wakeGoal } from './game.js'
+import { createGame, descentDuration, descentFadeAt, encounterLimit, entityTypes, phoneRushDuration, returnDuration, returnFadeAt, returnReachAt, sipDuration, streetLightFade, streetWakeSeconds, wakeGoal } from './game.js'
 import { dateDialogue, streetDialogue } from './dialogue.js'
 import { createView } from './view.js'
 import { bindThumbstick } from './thumbstick.js'
@@ -82,7 +82,7 @@ function present() {
   const { phase } = game
   const waking = phase === 'waking' || phase === 'streetDazed'
   const playing = waking || phase === 'blackout' || phase === 'fireEscape' || phase === 'phoneDark' || phase === 'streetRun'
-  const speaking = phase === 'date' || phase === 'caught' || phase === 'phoneCaught' || phase === 'streetSafe'
+  const speaking = phase === 'date' || phase === 'caught' || phase === 'phoneCaught' || phase === 'streetSafe' || phase === 'returnCaught'
   gameScreen.dataset.phase = phase
   dialogueLayer.hidden = !speaking
   streetEnding.hidden = phase !== 'street'
@@ -104,6 +104,9 @@ function present() {
     } else if (phase === 'phoneCaught') {
       prompt = { character: 'heroine', speaker: 'You · Caught', text: game.streetChaseFailed ? 'It caught me before I reached the light.' : 'The phone went dark. Something crossed the street before my eyes adjusted.' }
     }
+    if (phase === 'returnCaught') {
+      prompt = { character: 'heroine', speaker: 'You · Caught', text: 'I went back inside. Something was already waiting for me.' }
+    }
     if (phase === 'streetSafe') {
       prompt = { character: 'heroine', speaker: 'You · Thinking', text: 'It stopped where the streetlights began. I kept walking.' }
     }
@@ -115,7 +118,7 @@ function present() {
     line.textContent = prompt.text
     showChoices(dateChoices, dateButtons, prompt.options)
     advance.hidden = Boolean(prompt.options)
-    advance.textContent = phase === 'streetSafe' ? 'End chapter' : phase === 'phoneCaught' ? 'Retry the street' : phase === 'caught' ? 'Retry nightmare' : 'Try another answer'
+    advance.textContent = phase === 'returnCaught' ? 'Retry the fire escape' : phase === 'streetSafe' ? 'End chapter' : phase === 'phoneCaught' ? 'Retry the street' : phase === 'caught' ? 'Retry nightmare' : 'Try another answer'
   }
   if (phase === 'street') {
     const prompt = streetSetback
@@ -192,6 +195,13 @@ function choose(index) {
 }
 
 function next() {
+  if (game.phase === 'returnCaught') {
+    game.retryFireEscape()
+    held.clear()
+    stick.reset()
+    present()
+    return
+  }
   if (game.phase === 'caught') return reset(true)
   if (game.phase === 'phoneCaught' || (game.phase === 'street' && streetSetback)) {
     streetSetback = undefined
@@ -225,7 +235,11 @@ if (view) {
   }
   phoneAction.addEventListener('click', next)
   endingRestart.addEventListener('click', () => reset())
-  const restart = () => reset(['waking', 'blackout', 'caught', 'fireEscape'].includes(game.phase))
+  const restart = () => {
+    if (game.phase === 'returnNightmare') return
+    if (game.phase === 'returnCaught') next()
+    else reset(['waking', 'blackout', 'caught', 'fireEscape'].includes(game.phase))
+  }
   restartButton.addEventListener('click', restart)
   for (const { element, labels } of itemButtons) {
     element.addEventListener('click', () => {
@@ -236,6 +250,10 @@ if (view) {
   window.addEventListener('keydown', event => {
     if (event.ctrlKey || event.metaKey || event.altKey) return
     const key = event.key.length === 1 ? event.key.toLowerCase() : event.key
+    if (game.phase === 'returnNightmare') {
+      if (movement.has(key) || ['e', 'r', 'Enter', ' '].includes(key)) event.preventDefault()
+      return
+    }
     if (movement.has(key)) {
       event.preventDefault()
       held.add(key)
@@ -276,7 +294,8 @@ if (view) {
       else if (game.phase === 'street') streetButtons[0].focus()
       else if (game.phase === 'complete') endingRestart.focus()
       if (game.phase === 'phoneRush' || game.phase === 'streetRun') playEntitySound('Hiss')
-      if (game.phase === 'streetRun') {
+      if (game.phase === 'returnNightmare') playEntitySound('Growl')
+      if (game.phase === 'streetRun' || game.phase === 'returnNightmare') {
         held.clear()
         stick.reset()
       }
@@ -318,11 +337,15 @@ if (view) {
     const awakeScene = ['party', 'date', 'sip'].includes(game.phase)
     const opacity = awakeScene || phoneDark || phoneRush || streetDazed || streetRun || game.phase === 'streetSafe' ? 0
       : outside || game.phase === 'descent' ? .16 : Math.min(1, [.32, .55, .76, 1][game.encounters] + game.penalties.darkness)
+    if (game.phase === 'returnNightmare' && game.cinematicElapsed >= returnReachAt
+      && game.cinematicElapsed - dt < returnReachAt) playEntitySound('Growl')
     let fade = game.phase === 'descent'
       ? Math.max(0, Math.min(1, (game.cinematicElapsed - descentFadeAt) / (descentDuration - descentFadeAt - .4)))
       : phoneRush ? Math.max(0, (game.phoneElapsed - phoneRushDuration + .22) / .22)
         : Number(game.phase === 'complete')
-    if (game.phase === 'sip') {
+    if (game.phase === 'returnNightmare') {
+      fade = Math.max(0, Math.min(1, (game.cinematicElapsed - returnFadeAt) / (returnDuration - returnFadeAt - .3)))
+    } else if (game.phase === 'sip') {
       const t = game.introElapsed
       const pulse = Math.sin(Math.PI * (t - .65) / 1.14) ** 2
       fade = t < .65 ? 0 : t < 2.93 ? pulse * .86 : Math.min(1, (t - 2.93) / (sipDuration - 3.28))

@@ -323,3 +323,7 @@ kbd{border:1px solid #bd8f8170;border-radius:4px;padding:.1rem .3rem;margin-left
 @media(prefers-reduced-motion:reduce){
   #game[data-phase="streetDazed"] #scene canvas{animation:none}
 }
+
+#game:is([data-phase="returnNightmare"],[data-phase="returnCaught"]) :is(header,footer){visibility:hidden}
+#game[data-phase="returnNightmare"] #scene canvas{filter:blur(1.45px) contrast(1.28) saturate(.72)}
+#game[data-phase="returnCaught"] #scene{visibility:hidden}

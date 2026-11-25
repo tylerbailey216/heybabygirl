@@ -6,6 +6,9 @@ export const entityTypes = [
 export const encounterLimit = entityTypes.length
 export const descentFadeAt = 7.7
 export const descentDuration = 9.3
+export const returnReachAt = 3.35
+export const returnFadeAt = 3.6
+export const returnDuration = 4.95
 export const descentDelays = [0, 1.9, 2.8, 3.7]
 export const partyDuration = 11.8
 export const guestDepartureTimes = [4.7, 6.1, 7.5, 9.2]
@@ -27,6 +30,8 @@ export const spots = {
   balcony: { x: 3.7, z: -3.5 },
   drawer: { x: -2.45, z: -2.53 },
   landing: { x: 4.65, z: 0 },
+  returnDoor: { x: -5.02, z: 0 },
+  returnHeroine: { x: 3.57, z: -2.73 },
 }
 const start = { x: 0, z: 0.9 }
 const entryCountdown = 10
@@ -108,6 +113,13 @@ export function createGame(setbacks = {}) {
       case 'Hide behind coats': game.hidden = true; game.latch = 0; break
       case 'Grab dining table': game.dragging = true; break
     }
+  }
+
+  function retryFireEscape() {
+    if (game.phase !== 'returnCaught') return
+    game.phase = 'fireEscape'
+    game.cinematicElapsed = 0
+    Object.assign(game.player, fireEscapeStart)
   }
 
   function beginSip() {
@@ -196,6 +208,11 @@ export function createGame(setbacks = {}) {
       else if (game.phase === 'sip' && game.introElapsed >= sipDuration) beginWake()
       return
     }
+    if (game.phase === 'returnNightmare') {
+      game.cinematicElapsed = Math.min(returnDuration, game.cinematicElapsed + dt)
+      if (game.cinematicElapsed >= returnDuration) game.phase = 'returnCaught'
+      return
+    }
     if (game.phase === 'descent') {
       game.cinematicElapsed = Math.min(descentDuration, game.cinematicElapsed + dt)
       if (game.cinematicElapsed >= descentDuration) game.phase = 'complete'
@@ -256,6 +273,11 @@ export function createGame(setbacks = {}) {
       const step = 1.55 * dt / normalizer
       game.player.x = Math.max(-5.12, Math.min(5.12, game.player.x + inputX * step))
       game.player.z = Math.max(-.65, Math.min(.65, game.player.z + inputZ * step))
+      if (inputX < 0 && game.player.x <= spots.returnDoor.x) {
+        Object.assign(game.player, spots.returnHeroine)
+        game.cinematicElapsed = 0
+        game.phase = 'returnNightmare'
+      }
       return
     }
     const waking = game.phase === 'waking'
@@ -324,5 +346,5 @@ export function createGame(setbacks = {}) {
     return game.elapsed >= entityArrivalAt()
   }
 
-  return Object.assign(game, { action, interact, update, entityArrivalAt, entityInside, beginSip, beginWake, beginPhoneTrap, retryStreet })
+  return Object.assign(game, { action, interact, update, entityArrivalAt, entityInside, beginSip, beginWake, beginPhoneTrap, retryStreet, retryFireEscape })
 }
