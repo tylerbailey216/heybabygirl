@@ -9,9 +9,12 @@ export const spots = {
   entry: { x: -5.2, z: -2.4 },
   coats: { x: -4.5, z: 0.1 },
   balcony: { x: 3.7, z: -3.5 },
+  drawer: { x: -2.45, z: -2.53 },
+  landing: { x: 4.65, z: 0 },
 }
 const start = { x: 0, z: 0.9 }
 const entryCountdown = 10
+const fireEscapeStart = { x: -4.65, z: 0 }
 const tableStart = { x: -1.4, z: -1.35 }
 const furniture = [
   { x: 2.3, z: 2.9, w: 4, d: 1.2 },
@@ -25,6 +28,7 @@ export function createGame() {
     phase: 'date', player: { ...start }, table: { ...tableStart },
     pursuer: { ...spots.entry }, elapsed: 0, entryAt: Infinity, reappearsAt: 0, encounters: 0,
     hidden: false, dragging: false, barricade: false, latch: 0,
+    hasPin: false, examinedLatch: false,
   }
 
   function clear(x, z, actor) {
@@ -42,13 +46,24 @@ export function createGame() {
   }
 
   function action() {
+    if (game.phase === 'fireEscape') {
+      return distance(game.player, spots.landing) < .85 ? 'Read phone' : ''
+    }
     if (game.phase !== 'blackout') return ''
     if (game.hidden) return 'Leave hiding spot'
     if (game.dragging) return 'Let go of table'
-    if (distance(game.player, spots.balcony) < 1.08) return 'Open balcony latch'
+    if (distance(game.player, spots.balcony) < 1.08) {
+      return game.hasPin ? 'Open balcony latch' : 'Inspect jammed latch'
+    }
+    if (!game.hasPin && distance(game.player, spots.drawer) < .83) return 'Search sideboard'
+    if (game.entryAt === Infinity && distance(game.player, spots.entry) < 1.13) return 'Check deadbolt'
     if (distance(game.player, spots.coats) < 0.9) return 'Hide behind coats'
     if (!game.barricade && game.elapsed < game.entryAt && distance(game.player, game.table) < 1.85) return 'Grab dining table'
     return ''
+  }
+
+  function triggerBreach() {
+    if (game.entryAt === Infinity) game.entryAt = game.elapsed + entryCountdown + (game.barricade ? 7 : 0)
   }
 
   function interact() {
@@ -60,7 +75,14 @@ export function createGame() {
         Object.assign(game.table, tableStart)
         if (!clear(game.player.x, game.player.z, game.player)) Object.assign(game.player, start)
         break
-      case 'Open balcony latch': game.latch ||= 1.3; break
+      case 'Inspect jammed latch': game.examinedLatch = true; break
+      case 'Search sideboard':
+        game.hasPin = true
+        triggerBreach()
+        break
+      case 'Check deadbolt': triggerBreach(); break
+      case 'Open balcony latch': game.latch ||= 2.5; break
+      case 'Read phone': game.phase = 'landing'; break
       case 'Hide behind coats': game.hidden = true; game.latch = 0; break
       case 'Grab dining table': game.dragging = true; break
     }
@@ -95,26 +117,29 @@ export function createGame() {
   let waypoint
   let repath = 0
   function update(dt, inputX, inputZ) {
+    const length = Math.hypot(inputX, inputZ)
+    const normalizer = Math.max(1, length)
+    if (game.phase === 'fireEscape') {
+      const step = 1.55 * dt / normalizer
+      game.player.x = Math.max(-5.12, Math.min(5.12, game.player.x + inputX * step))
+      game.player.z = Math.max(-.65, Math.min(.65, game.player.z + inputZ * step))
+      return
+    }
     if (game.phase !== 'blackout') return
     game.elapsed += dt
-    const length = Math.hypot(inputX, inputZ)
     if (!game.hidden && length) {
       const speed = game.dragging ? 1.8 : 3.35
       const x = game.player.x
       const z = game.player.z
       game.latch = 0
-      const normalizer = Math.max(1, length)
       move(game.player, inputX / normalizer * speed * dt, inputZ / normalizer * speed * dt)
-      if (game.entryAt === Infinity && distance(game.player, start) >= .45) {
-        game.entryAt = game.elapsed + entryCountdown
-      }
       if (game.dragging) {
         game.table.x += game.player.x - x
         game.table.z += game.player.z - z
         if (distance(game.player, spots.entry) < 1.1 && game.elapsed < game.entryAt) {
           game.barricade = true
           game.dragging = false
-          game.entryAt += 7
+          if (game.entryAt !== Infinity) game.entryAt += 7
           Object.assign(game.table, { x: -4.58, z: -2.5 })
           Object.assign(game.player, { x: -3.05, z: -2.48 })
           Object.assign(game.pursuer, { x: -4.9, z: -1.45 })
@@ -148,7 +173,10 @@ export function createGame() {
     }
     if (game.latch > 0) {
       game.latch -= dt
-      if (game.latch <= 0) game.phase = 'escaped'
+      if (game.latch <= 0) {
+        game.phase = 'fireEscape'
+        Object.assign(game.player, fireEscapeStart)
+      }
     }
   }
 

@@ -28,7 +28,8 @@ const touch = document.querySelector('#touch')
 const itemButtons = [
   { element: document.querySelector('#table-action'), labels: new Map([['Grab dining table', 'Grab table'], ['Let go of table', 'Release table']]), idle: 'Table' },
   { element: document.querySelector('#coats-action'), labels: new Map([['Hide behind coats', 'Hide'], ['Leave hiding spot', 'Leave coats']]), idle: 'Hide' },
-  { element: document.querySelector('#latch-action'), labels: new Map([['Open balcony latch', 'Open latch']]), idle: 'Latch' },
+  { element: document.querySelector('#inspect-action'), labels: new Map([['Search sideboard', 'Search'], ['Check deadbolt', 'Deadbolt'], ['Read phone', 'Read phone']]), idle: 'Inspect', outside: true },
+  { element: document.querySelector('#latch-action'), labels: new Map([['Inspect jammed latch', 'Check latch'], ['Open balcony latch', 'Open latch']]), idle: 'Latch' },
 ]
 const stick = bindThumbstick(document.querySelector('#thumbstick'))
 const status = document.querySelector('#status')
@@ -36,12 +37,19 @@ const hasTouch = matchMedia('(any-pointer: coarse)')
 const dialogue = [
   [datePortrait, 'Your date', 'I was going to ask if you wanted to stay for dessert.', 'What did you make?'],
   [datePortrait, 'Your date', 'You hear that? I thought we were the only ones out here.', 'Listen'],
+  [datePortrait, 'Your date', 'If that balcony sticks, the release pin is in the sideboard. Top drawer.', 'How did you know that?'],
   [heroinePortrait, 'You · Thinking', 'That came from the front door. Wait… where did you go?', 'Get up'],
 ]
 const endings = {
   caught: [heroinePortrait, 'You · Caught', 'It came back. This time, the light didn’t.', 'Retry blackout'],
-  escaped: [heroinePortrait, 'You · Escaped', 'The latch gave. I’m taking the fire stairs down.', 'Play again'],
+
 }
+
+const landingDialogue = [
+  [datePortrait, 'Text from your date', 'I’m downstairs. Whatever you hear, don’t answer it.', 'Look up'],
+  [datePortrait, 'A voice from above', 'Hey, baby girl. It’s me.', 'Keep going'],
+  [heroinePortrait, 'End of Chapter One', 'I kept my eyes on the steps. Behind me, the balcony door clicked shut.', 'Play again'],
+]
 
 let game = createGame()
 let beat = 0
@@ -58,12 +66,12 @@ try {
 }
 
 function present() {
-  const playing = game.phase === 'blackout'
+  const playing = game.phase === 'blackout' || game.phase === 'fireEscape'
   dialogueLayer.hidden = playing
   touch.hidden = !playing || !hasTouch.matches
   if (touch.hidden) stick.reset()
   if (!playing) {
-    const [image, name, text, button] = endings[game.phase] ?? dialogue[beat]
+    const [image, name, text, button] = game.phase === 'landing' ? landingDialogue[beat] : endings[game.phase] ?? dialogue[beat]
     portrait.src = image
     portrait.hidden = false
     speaker.textContent = name
@@ -89,7 +97,11 @@ function reset(phase = 'date') {
 
 function next() {
   if (game.phase === 'caught') return reset('blackout')
-  if (game.phase === 'escaped') return reset()
+  if (game.phase === 'landing') {
+    if (++beat === landingDialogue.length) reset()
+    else present()
+    return
+  }
   if (game.phase !== 'date') return
   beat++
   if (beat === dialogue.length) reset('blackout')
@@ -120,7 +132,7 @@ if (view) {
     event.preventDefault()
     if (event.repeat) return
     if (key === 'r') reset(game.phase === 'date' ? 'date' : 'blackout')
-    else if (game.phase === 'blackout') game.interact()
+    else if (game.phase === 'blackout' || game.phase === 'fireEscape') game.interact()
     else next()
   })
   window.addEventListener('keyup', event => held.delete(event.key.length === 1 ? event.key.toLowerCase() : event.key))
@@ -131,20 +143,23 @@ if (view) {
   const pressed = (...keys) => keys.some(key => held.has(key))
   let previousTime = performance.now()
   let previousDarkness
+  let displayedPhase = game.phase
   function frame(now) {
     const dt = Math.min((now - previousTime) / 1000, .05)
     previousTime = now
-    const phase = game.phase
     const keyboardX = Number(pressed('d', 'ArrowRight')) - Number(pressed('a', 'ArrowLeft'))
     const keyboardZ = Number(pressed('s', 'ArrowDown')) - Number(pressed('w', 'ArrowUp'))
     const usingKeyboard = keyboardX !== 0 || keyboardZ !== 0
     game.update(dt, usingKeyboard ? keyboardX : stick.x, usingKeyboard ? keyboardZ : stick.z)
-    if (phase !== game.phase) {
+    if (displayedPhase !== game.phase) {
+      displayedPhase = game.phase
+      if (game.phase === 'landing') beat = 0
       present()
-      advance.focus()
+      if (!dialogueLayer.hidden) advance.focus()
     }
 
     const playing = game.phase === 'blackout'
+    const outside = game.phase === 'fireEscape'
     const prompt = game.action()
     const arrivalAt = game.entityArrivalAt()
     const entityInside = playing && game.entityInside()
@@ -165,28 +180,35 @@ if (view) {
       entityDialogue.hidden = true
       entityVoice.textContent = ''
     }
-    const opacity = game.phase === 'date' ? 0 : [.32, .55, .76, 1][game.encounters]
+    const opacity = game.phase === 'date' ? 0
+      : outside || game.phase === 'landing' ? .16 : [.32, .55, .76, 1][game.encounters]
     if (previousDarkness !== opacity) {
       darkness.style.opacity = opacity
       darkness.classList.toggle('blackout-complete', game.encounters >= encounterLimit)
       previousDarkness = opacity
     }
     const secondsToArrival = Math.ceil(arrivalAt - game.elapsed)
-    let timing = 'Move to investigate'
+    let timing = 'The power is out'
     if (entityInside) timing = 'It’s inside'
     else if (Number.isFinite(secondsToArrival)) {
       timing = `${game.encounters ? 'Returns' : 'Door bursts open'} in ${secondsToArrival}s`
     }
-    let hint = prompt || 'Get to the balcony latch'
+    let hint = game.hasPin ? 'Release pin found · Head to the balcony' : 'Check the balcony latch or search the sideboard'
+    if (prompt) hint = prompt
+    if (game.examinedLatch && !game.hasPin && (!prompt || prompt === 'Inspect jammed latch')) {
+      hint = 'Latch jammed · Find the release pin in the sideboard'
+    }
     if (game.latch > 0) hint = 'Opening the latch… Hold still'
     else if (game.dragging) hint = 'Drag the table toward the entry'
     else if (game.hidden) hint = 'Hidden · Interact to leave the coats'
-    else if (game.barricade && game.elapsed < game.entryAt && !prompt) hint = 'Entry blocked · Get to the balcony latch'
+    else if (game.barricade && game.elapsed < game.entryAt && !prompt) hint = game.hasPin ? 'Entry blocked · Head to the balcony' : 'Entry blocked · Find the release pin'
     const encounters = game.encounters ? ` · Encounters ${game.encounters}/${encounterLimit}` : ''
-    const message = playing ? `${timing} · ${hint}${encounters}` : ''
+    const message = outside ? (prompt ? 'Your phone lights up · Read message' : 'Fire escape · Follow the stairs to the right')
+      : playing ? `${timing} · ${hint}${encounters}` : ''
     if (message !== status.textContent) status.textContent = message
-    for (const { element, labels, idle } of itemButtons) {
-      const label = labels.get(prompt) ?? idle
+    for (const { element, labels, idle, outside: outdoorButton } of itemButtons) {
+      element.hidden = outside && !outdoorButton
+      const label = labels.get(prompt) ?? (outside ? 'Phone' : idle)
       if (element.textContent !== label) element.textContent = label
       element.disabled = !labels.has(prompt) || game.latch > 0
     }

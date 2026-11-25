@@ -38,7 +38,7 @@ export function createHeroine(scene, fallback) {
   const candleLight = new T.Color('#ffe3bf')
   const moonLight = new T.Color('#92aeeb')
 
-  return function pose(game, time) {
+  return function pose(game, time, ground = 0) {
     const { player, phase, table } = game
     if (run !== game) {
       run = game
@@ -50,7 +50,7 @@ export function createHeroine(scene, fallback) {
     const dx = player.x - previous.x
     const dz = player.z - previous.y
     previous.set(player.x, player.z)
-    const moving = phase === 'blackout' && !game.hidden && Math.hypot(dx, dz) > .0001
+    const moving = (phase === 'blackout' || phase === 'fireEscape') && !game.hidden && Math.hypot(dx, dz) > .0001
     if (moving) {
       walkStarted ??= time
       row = Math.abs(dx) > Math.abs(dz) ? 1 : dz < 0 ? 2 : 0
@@ -62,12 +62,14 @@ export function createHeroine(scene, fallback) {
     const frame = walkStarted === null ? 0 : walkFrames[Math.floor((time - walkStarted) * frameRate) % walkFrames.length]
     atlas.repeat.set((mirrored ? -1 : 1) / columns, 1 / rows)
     atlas.offset.set((frame + Number(mirrored)) / columns, (rows - 1 - row) / rows)
-    sprite.position.set(player.x, .02, player.z)
+    sprite.position.set(player.x, ground + .02, player.z)
     sprite.visible = ready && !game.hidden
     fallback.visible = !ready && !game.hidden
 
     if (phase === 'date') {
       material.color.copy(dateLight)
+    } else if (phase === 'fireEscape' || phase === 'landing') {
+      material.color.copy(moonLight)
     } else {
       const candle = Math.max(0, 1 - Math.hypot(player.x - table.x, player.z - table.z) / 5)
       const moon = Math.max(0, 1 - Math.hypot(player.x - 3.3, player.z + 4.4) / 5)

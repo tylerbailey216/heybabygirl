@@ -320,12 +320,59 @@ export function createView(container) {
   date.group.position.set(.3, 0, -2.23)
   date.group.rotation.y = -.3
 
+  const fireEscape = new T.Group()
+  fireEscape.visible = false
+  scene.add(fireEscape)
+  const firstStepX = -5.16
+  const treadWidth = .569
+  const floorHeight = x => {
+    const tread = Math.floor((x - firstStepX) / treadWidth + .5)
+    return -.13 * Math.max(0, Math.min(12, tread - 3))
+  }
+  box(fireEscape, '#262439', 0, .5, -1.38, 12.2, 6.2, .32)
+  const brickColors = ['#393348', '#302c40', '#433749', '#353047']
+  for (let row = 0; row < 9; row++) {
+    for (let col = 0; col < 13; col++) {
+      const x = -6 + col * .96 + (row % 2 ? .35 : 0)
+      box(fireEscape, brickColors[(row + col * 3) % 4], x, -2.06 + row * .63, -1.19, .92, .59, .05, false)
+    }
+  }
+  for (const [x, y] of [[-4.62, 1.1], [-.8, .7], [3.88, .24]]) {
+    box(fireEscape, '#161728', x, y, -1.13, 1.42, 2.06, .14)
+    box(fireEscape, '#30476e', x, y, -1.048, 1.25, 1.86, .06)
+    box(fireEscape, '#222235', x, y, -1.004, .045, 1.86, .06)
+    box(fireEscape, '#222235', x, y, -1.004, 1.25, .045, .06)
+  }
+  for (let i = 0; i < 19; i++) {
+    const x = firstStepX + i * treadWidth
+    const y = floorHeight(x)
+    box(fireEscape, '#424765', x, y - .078, 0, .591, .155, 1.79)
+    box(fireEscape, '#282b44', x, y + .66, .83, .593, .07, .075)
+    box(fireEscape, '#24253c', x, y + .34, .83, .052, .68, .052)
+    for (const z of [-.5, 0, .5]) box(fireEscape, '#515879', x, y + .006, z, .51, .013, .026, false)
+  }
+  const landingLight = new T.PointLight('#80acff', 24, 10, 2)
+  landingLight.position.set(1.3, 2.4, 3.4)
+  fireEscape.add(landingLight)
+  const glow = oval(fireEscape, '#9ed5ff', spots.landing.x, floorHeight(spots.landing.x) + .065, -.51, .13, .035, .19)
+  glow.material = new T.MeshBasicMaterial({ color: '#9ed5ff', transparent: true, opacity: .68 })
+  const outsideRainGeometry = new T.BufferGeometry()
+  const outsideDrops = new Float32Array(102 * 6)
+  outsideRainGeometry.setAttribute('position', new T.BufferAttribute(outsideDrops, 3).setUsage(T.DynamicDrawUsage))
+  const outsideRain = new T.LineSegments(outsideRainGeometry, new T.LineBasicMaterial({
+    color: '#9cbbef', opacity: .48, transparent: true, depthWrite: false,
+  }))
+  outsideRain.frustumCulled = false
+  fireEscape.add(outsideRain)
+
   const markers = document.querySelector('#markers')
   const labels = [
     ['Entry', -5.05, 2.4, spots.entry.z],
     ['Hanging coats', -4.85, 1.94, spots.coats.z],
     ['Dining table', 0, 1.2, 0],
     ['Balcony latch', spots.balcony.x, 2.1, spots.balcony.z],
+    ['Sideboard', spots.drawer.x, 1.24, -3.3],
+    ['Landing', spots.landing.x, floorHeight(spots.landing.x) + .83, 0],
   ].map(([name, x, y, z]) => {
     const element = document.createElement('span')
     element.className = 'marker'
@@ -359,7 +406,11 @@ export function createView(container) {
   }
   function render(game, time) {
     const blackout = game.phase !== 'date'
-    const inside = blackout && game.entityInside()
+    const outside = game.phase === 'fireEscape' || game.phase === 'landing'
+    const inside = game.phase === 'blackout' && game.entityInside()
+    const ground = outside ? floorHeight(game.player.x) : 0
+    room.visible = !outside
+    fireEscape.visible = outside
     ceiling.intensity = blackout ? .04 : 2.05
     ambient.intensity = blackout ? .31 : 1.18
     moon.intensity = blackout ? 26 : 15
@@ -369,11 +420,12 @@ export function createView(container) {
     const burst = inside ? Math.min(1, (game.elapsed - game.entityArrivalAt()) / .28) : 0
     const swing = 1 - (1 - burst) ** 3 + Math.sin(burst * Math.PI) * .19
     door.rotation.y = -1.17 * swing
-    glass.position.x = game.phase === 'escaped' ? -1.35 : 0
+    glass.position.x = outside ? -1.35 : 0
     date.group.visible = !blackout
     pursuer.group.visible = inside
     actorPose(player, game.player, time)
-    poseHeroine(game, time)
+    player.group.position.y = ground
+    poseHeroine(game, time, ground)
     heroineShadow.position.x = game.player.x
     heroineShadow.position.z = game.player.z + .06
     heroineShadow.visible = !game.hidden
@@ -392,8 +444,8 @@ export function createView(container) {
       wisp.material.opacity = Math.sin(progress * Math.PI) * .64
     }
     labels[2].position.set(game.table.x, 1.42, game.table.z)
-    for (const { element, position } of labels) {
-      element.hidden = game.phase !== 'blackout'
+    for (const [index, { element, position }] of labels.entries()) {
+      element.hidden = index === labels.length - 1 ? game.phase !== 'fireEscape' : game.phase !== 'blackout'
       const projected = position.clone().project(camera)
       element.style.left = `${(projected.x + 1) * 50}%`
       element.style.top = `${(1 - projected.y) * 50}%`
@@ -405,6 +457,16 @@ export function createView(container) {
       drops.set([x, y, z, x + .044, y + .13, z], i * 6)
     }
     rainGeometry.attributes.position.needsUpdate = true
+    if (outside) {
+      glow.material.opacity = .49 + Math.sin(time * 3.5) * .19
+      for (let i = 0; i < outsideDrops.length / 6; i++) {
+        const x = ((i * .61803399) % 1) * 12 - 6
+        const y = 3.4 - ((i * .387 + time * (.66 + i % 4 * .12)) % 1) * 6
+        const z = ((i * .733) % 1) * 3.8 - 1.15
+        outsideDrops.set([x, y, z, x + .055, y + .21, z], i * 6)
+      }
+      outsideRainGeometry.attributes.position.needsUpdate = true
+    }
     renderer.render(scene, camera)
   }
   return { render }

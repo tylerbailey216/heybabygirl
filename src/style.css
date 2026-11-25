@@ -26,7 +26,8 @@ kbd{border:1px solid #bd8f8170;border-radius:4px;padding:.1rem .3rem;margin-left
 #touch[hidden]{display:none}
 #thumbstick{width:clamp(92px,25vw,126px);aspect-ratio:1;display:grid;place-items:center;border:2px solid #bc9297b0;border-radius:50%;background:repeating-radial-gradient(circle,#211722bf 0 17%,#c8999c55 18% 19%,#211722bf 20% 33%);touch-action:none;pointer-events:auto;user-select:none;-webkit-touch-callout:none}
 #thumbstick span{width:45%;aspect-ratio:1;border:2px solid #e2adb2;border-radius:50%;background:radial-gradient(circle at 35% 25%,#9d636e,#4c3043 72%);box-shadow:0 4px 12px #120b14aa;pointer-events:none}
-.actions{display:grid;grid-template-columns:repeat(3,minmax(44px,auto));gap:5px;align-items:end}
+.actions{display:grid;grid-template-columns:repeat(2,minmax(44px,auto));gap:5px;align-items:end}
+.actions:has(button[hidden]){grid-template-columns:auto}
 .actions button{min-height:46px;min-width:46px;padding:.45rem .48rem;border-radius:16px;font-size:.8rem;max-width:85px;background:#513045f5}
 .actions button:active{background:#694453}
 .actions button:disabled{opacity:.7;background:#251a29e8;color:#ddc4bf}
