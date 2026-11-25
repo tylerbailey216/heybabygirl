@@ -95,7 +95,8 @@ export function createGame() {
       const x = game.player.x
       const z = game.player.z
       game.latch = 0
-      move(game.player, inputX / length * speed * dt, inputZ / length * speed * dt)
+      const normalizer = Math.max(1, length)
+      move(game.player, inputX / normalizer * speed * dt, inputZ / normalizer * speed * dt)
       if (game.dragging) {
         game.table.x += game.player.x - x
         game.table.z += game.player.z - z
