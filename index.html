@@ -16,7 +16,16 @@
   <div id="dialogue" class="dialogue-layer">
     <img id="portrait" class="dialogue-portrait" alt="" hidden>
     <section id="panel" class="dialogue-panel" aria-live="polite">
-      <p id="speaker" class="eyebrow"></p><h2 id="line"></h2><button id="continue" type="button"></button>
+      <div class="speaker-line">
+        <img id="speaker-card" class="speaker-card" alt="" hidden>
+        <p id="speaker" class="eyebrow"></p>
+      </div>
+      <h2 id="line"></h2>
+      <div id="date-choices" class="dialogue-choices" role="group" aria-label="Responses">
+        <button type="button" data-choice="0"></button>
+        <button type="button" data-choice="1"></button>
+      </div>
+      <button id="continue" type="button" hidden></button>
     </section>
   </div>
   <div id="entity-dialogue" class="dialogue-layer" hidden>
@@ -38,9 +47,16 @@
   <section id="street-ending" aria-labelledby="street-title" hidden>
     <img id="street-art" alt="The heroine checking her phone on an empty, rain-soaked street">
     <div class="street-message">
-      <p class="eyebrow" id="street-title">STREET LEVEL</p>
-      <p id="phone-message" aria-live="polite" hidden>“I’m downstairs. Whatever you hear, don’t answer it.”</p>
-      <button id="phone-action" type="button">Check phone</button>
+      <div class="speaker-line">
+        <img id="street-speaker-card" class="speaker-card" alt="" hidden>
+        <p class="eyebrow" id="street-title">Street level</p>
+      </div>
+      <p id="phone-message" aria-live="polite"></p>
+      <div id="street-choices" class="dialogue-choices" role="group" aria-label="Responses">
+        <button type="button" data-choice="0"></button>
+        <button type="button" data-choice="1"></button>
+      </div>
+      <button id="phone-action" type="button" hidden>Retry the street</button>
     </div>
   </section>
   <div id="cinematic-fade" aria-hidden="true"></div>

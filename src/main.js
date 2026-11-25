@@ -1,5 +1,6 @@
 import './style.css'
 import { createGame, descentDuration, descentFadeAt, encounterLimit, entityTypes } from './game.js'
+import { dateDialogue, streetDialogue } from './dialogue.js'
 import { createView } from './view.js'
 import { bindThumbstick } from './thumbstick.js'
 import { enableEntityAudio, playEntitySound } from './entity-audio.js'
@@ -16,6 +17,10 @@ const streetEnding = document.querySelector('#street-ending')
 const streetImage = document.querySelector('#street-art')
 const phoneMessage = document.querySelector('#phone-message')
 const phoneAction = document.querySelector('#phone-action')
+const streetSpeaker = document.querySelector('#street-title')
+const streetSpeakerCard = document.querySelector('#street-speaker-card')
+const streetChoices = document.querySelector('#street-choices')
+const streetButtons = [...streetChoices.querySelectorAll('button')]
 const endingSplash = document.querySelector('#ending-splash')
 const endingImage = document.querySelector('#ending-art')
 const endingRestart = document.querySelector('#ending-restart')
@@ -36,6 +41,9 @@ const entityEntranceBeat = .9
 const speaker = document.querySelector('#speaker')
 const line = document.querySelector('#line')
 const advance = document.querySelector('#continue')
+const speakerCard = document.querySelector('#speaker-card')
+const dateChoices = document.querySelector('#date-choices')
+const dateButtons = [...dateChoices.querySelectorAll('button')]
 const touch = document.querySelector('#touch')
 const itemButtons = [
   { element: document.querySelector('#table-action'), labels: new Map([['Grab dining table', 'Grab table'], ['Let go of table', 'Release table']]), idle: 'Table' },
@@ -46,16 +54,12 @@ const itemButtons = [
 const stick = bindThumbstick(document.querySelector('#thumbstick'))
 const status = document.querySelector('#status')
 const hasTouch = matchMedia('(any-pointer: coarse)')
-const dialogue = [
-  [datePortrait, 'Your date', 'I was going to ask if you wanted to stay for dessert.', 'What did you make?'],
-  [datePortrait, 'Your date', 'You hear that? I thought we were the only ones out here.', 'Listen'],
-  [datePortrait, 'Your date', 'If that balcony sticks, the release pin is in the sideboard. Top drawer.', 'How did you know that?'],
-  [heroinePortrait, 'You · Thinking', 'That came from the front door. Wait… where did you go?', 'Get up'],
-]
-const caughtDialogue = [heroinePortrait, 'You · Caught', 'It came back. This time, the light didn’t.', 'Retry blackout']
-
+const portraits = { date: datePortrait, heroine: heroinePortrait }
+const appliedSetbacks = new Set()
 let game = createGame()
 let beat = 0
+let dateSetback
+let streetSetback
 const held = new Set()
 let view
 try {
@@ -64,6 +68,7 @@ try {
   console.error(error)
   speaker.textContent = 'Graphics unavailable'
   line.textContent = 'This demo needs WebGL 2. Open it in a browser with hardware acceleration enabled.'
+  dateChoices.hidden = true
   advance.hidden = true
   restartButton.hidden = true
 }
@@ -79,24 +84,52 @@ function present() {
   touch.hidden = !playing || !hasTouch.matches
   if (touch.hidden) stick.reset()
   if (speaking) {
-    const [image, name, text, button] = phase === 'caught' ? caughtDialogue : dialogue[beat]
-    portrait.src = image
-    portrait.hidden = false
-    speaker.textContent = name
-    line.textContent = text
-    advance.textContent = button
+    const prompt = phase === 'caught'
+      ? { character: 'heroine', speaker: 'You · Caught', text: 'It came back. This time, the light didn’t.' }
+      : dateSetback ? { character: 'heroine', speaker: 'You · Thinking', text: dateSetback } : dateDialogue[beat]
+    const image = portraits[prompt.character]
+    portrait.hidden = Boolean(prompt.offscreen)
+    if (!portrait.hidden) portrait.src = image
+    showSpeakerCard(speakerCard, prompt.offscreen ? image : undefined)
+    speaker.textContent = prompt.speaker
+    line.textContent = prompt.text
+    showChoices(dateChoices, dateButtons, prompt.options)
+    advance.hidden = Boolean(prompt.options)
+    advance.textContent = phase === 'caught' ? 'Retry blackout' : 'Try another answer'
   }
   if (phase === 'street') {
-    phoneMessage.hidden = !game.phoneRead
-    phoneAction.textContent = game.action()
+    const prompt = streetSetback
+      ? { character: 'heroine', speaker: 'You · Caught', text: streetSetback }
+      : streetDialogue[Number(game.phoneRead)]
+    streetEnding.classList.toggle('street-failed', Boolean(streetSetback))
+    streetSpeaker.textContent = prompt.speaker
+    showSpeakerCard(streetSpeakerCard, portraits[prompt.character])
+    phoneMessage.textContent = prompt.text
+    showChoices(streetChoices, streetButtons, prompt.options)
+    phoneAction.hidden = !streetSetback
   }
+}
+
+function showSpeakerCard(card, image) {
+  card.hidden = !image
+  if (image) card.src = image
+}
+
+function showChoices(group, buttons, options) {
+  group.hidden = !options
+  options?.forEach(({ label }, index) => {
+    buttons[index].textContent = label
+  })
 }
 
 function reset(phase = 'date') {
   if (phase === 'blackout') enableEntityAudio()
-  game = createGame()
+  game = createGame(phase === 'blackout' ? game.penalties : undefined)
+  if (phase === 'date') appliedSetbacks.clear()
   game.phase = phase
   beat = 0
+  dateSetback = undefined
+  streetSetback = undefined
   shownEntity = -1
   voiceEndsAt = 0
   wasInside = false
@@ -107,18 +140,46 @@ function reset(phase = 'date') {
   present()
 }
 
+function choose(index) {
+  if (game.phase === 'date' && !dateSetback) {
+    const option = dateDialogue[beat].options[index]
+    if (option.setback) {
+      dateSetback = option.setback.text
+      if (!appliedSetbacks.has(beat)) {
+        game.penalties[option.setback.key] += option.setback.value
+        appliedSetbacks.add(beat)
+      }
+      present()
+      advance.focus()
+    } else if (++beat === dateDialogue.length) {
+      reset('blackout')
+    } else {
+      present()
+      dateButtons[0].focus()
+    }
+  } else if (game.phase === 'street' && !streetSetback) {
+    const option = streetDialogue[Number(game.phoneRead)].options[index]
+    if (option.setback) streetSetback = option.setback
+    else game.interact()
+    present()
+    if (streetSetback) phoneAction.focus()
+    else if (game.phase === 'street') streetButtons[0].focus()
+  }
+}
+
 function next() {
   if (game.phase === 'caught') return reset('blackout')
-  if (game.phase === 'street') {
-    game.interact()
-    present()
-    return
-  }
   if (game.phase === 'complete') return reset()
-  if (game.phase !== 'date') return
-  beat++
-  if (beat === dialogue.length) reset('blackout')
-  else present()
+  if (game.phase === 'date' && dateSetback) {
+    dateSetback = undefined
+    present()
+    dateButtons[0].focus()
+  }
+  if (game.phase === 'street' && streetSetback) {
+    streetSetback = undefined
+    present()
+    streetButtons[0].focus()
+  }
 }
 
 const movement = new Set(['w', 'a', 's', 'd', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'])
@@ -127,6 +188,9 @@ if (view) {
   endingImage.src = splashArt
   present()
   advance.addEventListener('click', next)
+  for (const buttons of [dateButtons, streetButtons]) {
+    buttons.forEach((button, index) => button.addEventListener('click', () => choose(index)))
+  }
   phoneAction.addEventListener('click', next)
   endingRestart.addEventListener('click', () => reset())
   restartButton.addEventListener('click', () => reset(game.phase === 'date' ? 'date' : 'blackout'))
@@ -142,6 +206,10 @@ if (view) {
     if (movement.has(key)) {
       event.preventDefault()
       held.add(key)
+      return
+    }
+    if (key === '1' || key === '2') {
+      if (!event.repeat) choose(Number(key) - 1)
       return
     }
     const nativeButtonClick = event.target instanceof HTMLButtonElement && (key === 'Enter' || key === ' ')
@@ -171,8 +239,8 @@ if (view) {
     if (displayedPhase !== game.phase) {
       displayedPhase = game.phase
       present()
-      if (!dialogueLayer.hidden) advance.focus()
-      else if (game.phase === 'street') phoneAction.focus()
+      if (!dialogueLayer.hidden) (advance.hidden ? dateButtons[0] : advance).focus()
+      else if (game.phase === 'street') streetButtons[0].focus()
       else if (game.phase === 'complete') endingRestart.focus()
     }
 
@@ -199,7 +267,7 @@ if (view) {
       entityVoice.textContent = ''
     }
     const opacity = game.phase === 'date' ? 0
-      : outside || game.phase === 'descent' ? .16 : [.32, .55, .76, 1][game.encounters]
+      : outside || game.phase === 'descent' ? .16 : Math.min(1, [.32, .55, .76, 1][game.encounters] + game.penalties.darkness)
     const fade = game.phase === 'descent'
       ? Math.max(0, Math.min(1, (game.cinematicElapsed - descentFadeAt) / (descentDuration - descentFadeAt - .4)))
       : Number(game.phase === 'complete')
@@ -234,7 +302,7 @@ if (view) {
       if (element.textContent !== label) element.textContent = label
       element.disabled = !labels.has(prompt) || game.latch > 0
     }
-    view.render(game, now / 1000)
+    view.render(game, now / 1000, beat >= 2)
     requestAnimationFrame(frame)
   }
   requestAnimationFrame(frame)

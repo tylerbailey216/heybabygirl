@@ -253,3 +253,22 @@ kbd{border:1px solid #bd8f8170;border-radius:4px;padding:.1rem .3rem;margin-left
 }
 #game[data-phase="descent"]::before{top:0}
 #game[data-phase="descent"]::after{bottom:0}
+
+.speaker-line{display:flex;align-items:center;gap:.65rem;margin-bottom:.32rem}
+.speaker-line .eyebrow{margin:0}
+.speaker-card{
+  width:clamp(37px,11vw,55px);
+  aspect-ratio:1;
+  object-fit:cover;
+  object-position:50% 12%;
+  flex:none;
+  border:1px solid #ba8a91;
+  border-radius:4px;
+  background:linear-gradient(145deg,#4a303f,#221b2b);
+}
+.dialogue-choices{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.45rem;margin-top:.8rem}
+.dialogue-choices[hidden]{display:none}
+.dialogue-choices button{min-height:44px;padding:.55rem .6rem;line-height:1.2;font-size:clamp(.84rem,3.45vw,1rem)}
+.dialogue-choices button:is(:hover,:focus-visible){background:#513045;border-color:#f3a6ad}
+#phone-action{min-height:44px}
+#street-ending.street-failed::after{background:linear-gradient(0deg,#07060d, #180812c9 60%,#08071091)}

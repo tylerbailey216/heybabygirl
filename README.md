@@ -20,6 +20,8 @@ npm run preview
 
 ## Controls
 
+Tap a dialogue response or press **1** or **2**. Each prompt has one response that advances the story. A wrong answer in the apartment changes the current run, even if you retry the blackout. A wrong answer at street level sends you back to that street prompt.
+
 | Action | Keyboard | Touch |
 | --- | --- | --- |
 | Advance dialogue | Enter, Space or E | Tap the response |

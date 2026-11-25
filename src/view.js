@@ -420,7 +420,7 @@ export function createView(container) {
     }
   }
 
-  function render(game, time) {
+  function render(game, time, dateOffscreen) {
     if (game.phase === 'street' || game.phase === 'complete') return
     const blackout = game.phase !== 'date'
     const cinematic = game.phase === 'descent'
@@ -443,14 +443,16 @@ export function createView(container) {
     ceiling.intensity = blackout ? .04 : 2.05
     ambient.intensity = blackout ? .31 : 1.18
     moon.intensity = blackout ? 26 : 15
-    candle.intensity = (blackout ? 23 : 11) + Math.sin(time * 19) * 1.4 + Math.sin(time * 8) * 1.2
+    const candleLit = !blackout || !game.penalties.darkness
+    flame.visible = candleLit
+    candle.intensity = candleLit ? (blackout ? 23 : 11) + Math.sin(time * 19) * 1.4 + Math.sin(time * 8) * 1.2 : 0
     flame.scale.y = 1 + Math.sin(time * 16) * .13
     table.position.set(game.table.x, 0, game.table.z)
     const burst = inside ? Math.min(1, (game.elapsed - game.entityArrivalAt()) / .28) : 0
     const swing = 1 - (1 - burst) ** 3 + Math.sin(burst * Math.PI) * .19
     door.rotation.y = -1.17 * swing
     glass.position.x = outside ? -1.35 : 0
-    date.group.visible = !blackout
+    date.group.visible = !blackout && !dateOffscreen
     pursuer.group.visible = inside
     actorPose(player, game.player, time)
     player.group.position.y = ground

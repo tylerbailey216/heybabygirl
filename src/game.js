@@ -26,9 +26,10 @@ const furniture = [
 ]
 export const distance = (a, b) => Math.hypot(a.x - b.x, a.z - b.z)
 
-export function createGame() {
+export function createGame(setbacks = {}) {
+  const penalties = { entry: 0, latch: 0, darkness: 0, ...setbacks }
   const game = {
-    phase: 'date', player: { ...start }, table: { ...tableStart },
+    phase: 'date', penalties, player: { ...start }, table: { ...tableStart },
     pursuer: { ...spots.entry }, elapsed: 0, entryAt: Infinity, reappearsAt: 0, encounters: 0,
     hidden: false, dragging: false, barricade: false, latch: 0,
     hasPin: false, examinedLatch: false, phoneRead: false, cinematicElapsed: 0,
@@ -67,7 +68,7 @@ export function createGame() {
   }
 
   function triggerBreach() {
-    if (game.entryAt === Infinity) game.entryAt = game.elapsed + entryCountdown + (game.barricade ? 7 : 0)
+    if (game.entryAt === Infinity) game.entryAt = game.elapsed + entryCountdown - penalties.entry + (game.barricade ? 7 : 0)
   }
 
   function interact() {
@@ -85,7 +86,7 @@ export function createGame() {
         triggerBreach()
         break
       case 'Check deadbolt': triggerBreach(); break
-      case 'Open balcony latch': game.latch ||= 2.5; break
+      case 'Open balcony latch': game.latch ||= 2.5 + penalties.latch; break
       case 'Step onto street': game.phase = 'street'; break
       case 'Check phone': game.phoneRead = true; break
       case 'Look up': game.phase = 'descent'; break
