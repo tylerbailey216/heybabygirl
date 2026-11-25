@@ -63,8 +63,9 @@ export function createHeroine(scene, fallback) {
     atlas.repeat.set((mirrored ? -1 : 1) / columns, 1 / rows)
     atlas.offset.set((frame + Number(mirrored)) / columns, (rows - 1 - row) / rows)
     sprite.position.set(player.x, ground + .02, player.z)
-    sprite.visible = ready && !game.hidden
-    fallback.visible = !ready && !game.hidden
+    const visible = !game.hidden && phase !== 'descent'
+    sprite.visible = ready && visible
+    fallback.visible = !ready && visible
 
     if (phase === 'date') {
       material.color.copy(dateLight)

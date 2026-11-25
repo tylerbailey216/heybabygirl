@@ -1,5 +1,5 @@
 import * as T from 'three'
-import { entityTypes, spots } from './game.js'
+import { descentDelays, entityTypes, spots } from './game.js'
 import { createHeroine } from './heroine.js'
 import woodUrl from './assets/wood.webp'
 import plasterUrl from './assets/plaster.webp'
@@ -308,15 +308,21 @@ export function createView(container) {
   const poseHeroine = createHeroine(scene, player.group)
   const heroineShadow = contact(room, 0, 0, 1.05, .65, .75)
   const date = character('date')
-  const pursuer = character('shadow')
-  const wisps = Array.from({ length: 8 }, () => {
-    const mesh = new T.Mesh(new T.PlaneGeometry(.43, .78), new T.MeshBasicMaterial({
-      color: '#211229', map: shadowMap, transparent: true, depthWrite: false,
-      opacity: .45, side: T.DoubleSide,
-    }))
-    pursuer.group.add(mesh)
-    return mesh
-  })
+  function createShadow() {
+    const actor = character('shadow')
+    const wisps = Array.from({ length: 8 }, () => {
+      const mesh = new T.Mesh(new T.PlaneGeometry(.43, .78), new T.MeshBasicMaterial({
+        color: '#211229', map: shadowMap, transparent: true, depthWrite: false,
+        opacity: .45, side: T.DoubleSide,
+      }))
+      actor.group.add(mesh)
+      return mesh
+    })
+    return { ...actor, wisps }
+  }
+  const pursuer = createShadow()
+  const procession = descentDelays.map(createShadow)
+  const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)')
   date.group.position.set(.3, 0, -2.23)
   date.group.rotation.y = -.3
 
@@ -404,9 +410,32 @@ export function createView(container) {
     actor.legs[0].rotation.x = swing
     actor.legs[1].rotation.x = -swing
   }
+  function poseWisps(actor, time) {
+    for (const [i, wisp] of actor.wisps.entries()) {
+      const progress = (time * .64 + i / actor.wisps.length) % 1
+      const side = i % 2 === 0 ? -1 : 1
+      wisp.position.set(side * (.13 + progress * .43), .65 + progress * 1.22, Math.sin(i * 2.4) * .21)
+      wisp.rotation.z = -side * (.22 + progress * .59)
+      wisp.material.opacity = Math.sin(progress * Math.PI) * .64
+    }
+  }
+
   function render(game, time) {
+    if (game.phase === 'street' || game.phase === 'complete') return
     const blackout = game.phase !== 'date'
-    const outside = game.phase === 'fireEscape' || game.phase === 'landing'
+    const cinematic = game.phase === 'descent'
+    const outside = game.phase === 'fireEscape' || cinematic
+    const pan = cinematic && !reducedMotion.matches ? game.cinematicElapsed * .085 : 0
+    if (cinematic) {
+      camera.position.set(pan, 7.8, 11.4)
+      camera.lookAt(pan, .16, 0)
+      camera.zoom = 1.1
+    } else {
+      camera.position.set(0, 15, 9.5)
+      camera.lookAt(0, 0, -.35)
+      camera.zoom = 1
+    }
+    camera.updateProjectionMatrix()
     const inside = game.phase === 'blackout' && game.entityInside()
     const ground = outside ? floorHeight(game.player.x) : 0
     room.visible = !outside
@@ -436,13 +465,20 @@ export function createView(container) {
     }
     const entity = entityTypes[Math.min(game.encounters, entityTypes.length - 1)]
     pursuer.group.scale.set(...entity.scale)
-    for (const [i, wisp] of wisps.entries()) {
-      const progress = (time * .64 + i / wisps.length) % 1
-      const side = i % 2 === 0 ? -1 : 1
-      wisp.position.set(side * (.13 + progress * .43), .65 + progress * 1.22, Math.sin(i * 2.4) * .21)
-      wisp.rotation.z = -side * (.22 + progress * .59)
-      wisp.material.opacity = Math.sin(progress * Math.PI) * .64
-    }
+    if (inside) poseWisps(pursuer, time)
+    procession.forEach((actor, index) => {
+      const walkTime = game.cinematicElapsed - descentDelays[index]
+      actor.group.visible = cinematic && walkTime >= 0
+      if (!actor.group.visible) return
+      const type = entityTypes[index % entityTypes.length]
+      actor.group.scale.set(...type.scale)
+      const x = Math.min(4.45, -4.85 + walkTime * [1.07, 1.02, 1.04, .98][index])
+      const position = { x, z: -.12 + index % 2 * .2 }
+      actorPose(actor, position, walkTime * .92)
+      actor.group.position.y = floorHeight(x)
+      actor.group.rotation.y = 1.1
+      poseWisps(actor, time + index * .23)
+    })
     labels[2].position.set(game.table.x, 1.42, game.table.z)
     for (const [index, { element, position }] of labels.entries()) {
       element.hidden = index === labels.length - 1 ? game.phase !== 'fireEscape' : game.phase !== 'blackout'
@@ -458,6 +494,7 @@ export function createView(container) {
     }
     rainGeometry.attributes.position.needsUpdate = true
     if (outside) {
+      glow.visible = !cinematic
       glow.material.opacity = .49 + Math.sin(time * 3.5) * .19
       for (let i = 0; i < outsideDrops.length / 6; i++) {
         const x = ((i * .61803399) % 1) * 12 - 6

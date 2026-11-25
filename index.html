@@ -35,6 +35,24 @@
       <button id="latch-action" type="button" disabled>Latch</button>
     </div>
   </div>
+  <section id="street-ending" aria-labelledby="street-title" hidden>
+    <img id="street-art" alt="The heroine checking her phone on an empty, rain-soaked street">
+    <div class="street-message">
+      <p class="eyebrow" id="street-title">STREET LEVEL</p>
+      <p id="phone-message" aria-live="polite" hidden>“I’m downstairs. Whatever you hear, don’t answer it.”</p>
+      <button id="phone-action" type="button">Check phone</button>
+    </div>
+  </section>
+  <div id="cinematic-fade" aria-hidden="true"></div>
+  <section id="ending-splash" aria-labelledby="ending-title" hidden>
+    <img id="ending-art" alt="The heroine in the rain, seen checking her phone and looking back over her shoulder">
+    <div class="ending-content">
+      <p class="eyebrow">END OF CHAPTER ONE</p>
+      <h2 id="ending-title">Hey Baby Girl<span>.</span></h2>
+      <p>Blackout Date</p>
+      <button id="ending-restart" type="button">Restart game</button>
+    </div>
+  </section>
   <footer id="keys"><kbd>WASD</kbd> <kbd>↑↓←→</kbd> Move <kbd>E</kbd> Interact <kbd>R</kbd> Restart</footer>
 </main>
 <script type="module" src="/src/main.js"></script>

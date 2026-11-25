@@ -1,5 +1,5 @@
 import './style.css'
-import { createGame, encounterLimit, entityTypes } from './game.js'
+import { createGame, descentDuration, descentFadeAt, encounterLimit, entityTypes } from './game.js'
 import { createView } from './view.js'
 import { bindThumbstick } from './thumbstick.js'
 import { enableEntityAudio, playEntitySound } from './entity-audio.js'
@@ -8,7 +8,19 @@ import datePortrait from './assets/date-portrait.webp'
 import tallPortrait from './assets/shadow-tall.webp'
 import heavyPortrait from './assets/shadow-heavy.webp'
 import wiryPortrait from './assets/shadow-wiry.webp'
+import streetArt from './assets/ending-phone.webp'
+import splashArt from './assets/ending-splash.webp'
 
+const gameScreen = document.querySelector('#game')
+const streetEnding = document.querySelector('#street-ending')
+const streetImage = document.querySelector('#street-art')
+const phoneMessage = document.querySelector('#phone-message')
+const phoneAction = document.querySelector('#phone-action')
+const endingSplash = document.querySelector('#ending-splash')
+const endingImage = document.querySelector('#ending-art')
+const endingRestart = document.querySelector('#ending-restart')
+const cinematicFade = document.querySelector('#cinematic-fade')
+const restartButton = document.querySelector('#restart')
 const dialogueLayer = document.querySelector('#dialogue')
 const portrait = document.querySelector('#portrait')
 const darkness = document.querySelector('#darkness')
@@ -28,7 +40,7 @@ const touch = document.querySelector('#touch')
 const itemButtons = [
   { element: document.querySelector('#table-action'), labels: new Map([['Grab dining table', 'Grab table'], ['Let go of table', 'Release table']]), idle: 'Table' },
   { element: document.querySelector('#coats-action'), labels: new Map([['Hide behind coats', 'Hide'], ['Leave hiding spot', 'Leave coats']]), idle: 'Hide' },
-  { element: document.querySelector('#inspect-action'), labels: new Map([['Search sideboard', 'Search'], ['Check deadbolt', 'Deadbolt'], ['Read phone', 'Read phone']]), idle: 'Inspect', outside: true },
+  { element: document.querySelector('#inspect-action'), labels: new Map([['Search sideboard', 'Search'], ['Check deadbolt', 'Deadbolt'], ['Step onto street', 'Step down']]), idle: 'Inspect', outside: true },
   { element: document.querySelector('#latch-action'), labels: new Map([['Inspect jammed latch', 'Check latch'], ['Open balcony latch', 'Open latch']]), idle: 'Latch' },
 ]
 const stick = bindThumbstick(document.querySelector('#thumbstick'))
@@ -40,16 +52,7 @@ const dialogue = [
   [datePortrait, 'Your date', 'If that balcony sticks, the release pin is in the sideboard. Top drawer.', 'How did you know that?'],
   [heroinePortrait, 'You · Thinking', 'That came from the front door. Wait… where did you go?', 'Get up'],
 ]
-const endings = {
-  caught: [heroinePortrait, 'You · Caught', 'It came back. This time, the light didn’t.', 'Retry blackout'],
-
-}
-
-const landingDialogue = [
-  [datePortrait, 'Text from your date', 'I’m downstairs. Whatever you hear, don’t answer it.', 'Look up'],
-  [datePortrait, 'A voice from above', 'Hey, baby girl. It’s me.', 'Keep going'],
-  [heroinePortrait, 'End of Chapter One', 'I kept my eyes on the steps. Behind me, the balcony door clicked shut.', 'Play again'],
-]
+const caughtDialogue = [heroinePortrait, 'You · Caught', 'It came back. This time, the light didn’t.', 'Retry blackout']
 
 let game = createGame()
 let beat = 0
@@ -62,21 +65,30 @@ try {
   speaker.textContent = 'Graphics unavailable'
   line.textContent = 'This demo needs WebGL 2. Open it in a browser with hardware acceleration enabled.'
   advance.hidden = true
-  document.querySelector('#restart').hidden = true
+  restartButton.hidden = true
 }
 
 function present() {
-  const playing = game.phase === 'blackout' || game.phase === 'fireEscape'
-  dialogueLayer.hidden = playing
+  const { phase } = game
+  const playing = phase === 'blackout' || phase === 'fireEscape'
+  const speaking = phase === 'date' || phase === 'caught'
+  gameScreen.dataset.phase = phase
+  dialogueLayer.hidden = !speaking
+  streetEnding.hidden = phase !== 'street'
+  endingSplash.hidden = phase !== 'complete'
   touch.hidden = !playing || !hasTouch.matches
   if (touch.hidden) stick.reset()
-  if (!playing) {
-    const [image, name, text, button] = game.phase === 'landing' ? landingDialogue[beat] : endings[game.phase] ?? dialogue[beat]
+  if (speaking) {
+    const [image, name, text, button] = phase === 'caught' ? caughtDialogue : dialogue[beat]
     portrait.src = image
     portrait.hidden = false
     speaker.textContent = name
     line.textContent = text
     advance.textContent = button
+  }
+  if (phase === 'street') {
+    phoneMessage.hidden = !game.phoneRead
+    phoneAction.textContent = game.action()
   }
 }
 
@@ -97,11 +109,12 @@ function reset(phase = 'date') {
 
 function next() {
   if (game.phase === 'caught') return reset('blackout')
-  if (game.phase === 'landing') {
-    if (++beat === landingDialogue.length) reset()
-    else present()
+  if (game.phase === 'street') {
+    game.interact()
+    present()
     return
   }
+  if (game.phase === 'complete') return reset()
   if (game.phase !== 'date') return
   beat++
   if (beat === dialogue.length) reset('blackout')
@@ -110,9 +123,13 @@ function next() {
 
 const movement = new Set(['w', 'a', 's', 'd', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'])
 if (view) {
+  streetImage.src = streetArt
+  endingImage.src = splashArt
   present()
   advance.addEventListener('click', next)
-  document.querySelector('#restart').addEventListener('click', () => reset(game.phase === 'date' ? 'date' : 'blackout'))
+  phoneAction.addEventListener('click', next)
+  endingRestart.addEventListener('click', () => reset())
+  restartButton.addEventListener('click', () => reset(game.phase === 'date' ? 'date' : 'blackout'))
   for (const { element, labels } of itemButtons) {
     element.addEventListener('click', () => {
       if (labels.has(game.action()) && game.latch <= 0) game.interact()
@@ -131,7 +148,7 @@ if (view) {
     if (nativeButtonClick || !['e', 'r', 'Enter', ' '].includes(key)) return
     event.preventDefault()
     if (event.repeat) return
-    if (key === 'r') reset(game.phase === 'date' ? 'date' : 'blackout')
+    if (key === 'r') reset(game.phase === 'date' || game.phase === 'complete' ? 'date' : 'blackout')
     else if (game.phase === 'blackout' || game.phase === 'fireEscape') game.interact()
     else next()
   })
@@ -153,9 +170,10 @@ if (view) {
     game.update(dt, usingKeyboard ? keyboardX : stick.x, usingKeyboard ? keyboardZ : stick.z)
     if (displayedPhase !== game.phase) {
       displayedPhase = game.phase
-      if (game.phase === 'landing') beat = 0
       present()
       if (!dialogueLayer.hidden) advance.focus()
+      else if (game.phase === 'street') phoneAction.focus()
+      else if (game.phase === 'complete') endingRestart.focus()
     }
 
     const playing = game.phase === 'blackout'
@@ -181,7 +199,11 @@ if (view) {
       entityVoice.textContent = ''
     }
     const opacity = game.phase === 'date' ? 0
-      : outside || game.phase === 'landing' ? .16 : [.32, .55, .76, 1][game.encounters]
+      : outside || game.phase === 'descent' ? .16 : [.32, .55, .76, 1][game.encounters]
+    const fade = game.phase === 'descent'
+      ? Math.max(0, Math.min(1, (game.cinematicElapsed - descentFadeAt) / (descentDuration - descentFadeAt - .4)))
+      : Number(game.phase === 'complete')
+    cinematicFade.style.opacity = fade
     if (previousDarkness !== opacity) {
       darkness.style.opacity = opacity
       darkness.classList.toggle('blackout-complete', game.encounters >= encounterLimit)
@@ -203,12 +225,12 @@ if (view) {
     else if (game.hidden) hint = 'Hidden · Interact to leave the coats'
     else if (game.barricade && game.elapsed < game.entryAt && !prompt) hint = game.hasPin ? 'Entry blocked · Head to the balcony' : 'Entry blocked · Find the release pin'
     const encounters = game.encounters ? ` · Encounters ${game.encounters}/${encounterLimit}` : ''
-    const message = outside ? (prompt ? 'Your phone lights up · Read message' : 'Fire escape · Follow the stairs to the right')
+    const message = outside ? (prompt ? 'Street level · Step down' : 'Fire escape · Follow the stairs to the right')
       : playing ? `${timing} · ${hint}${encounters}` : ''
     if (message !== status.textContent) status.textContent = message
     for (const { element, labels, idle, outside: outdoorButton } of itemButtons) {
       element.hidden = outside && !outdoorButton
-      const label = labels.get(prompt) ?? (outside ? 'Phone' : idle)
+      const label = labels.get(prompt) ?? (outside ? 'Street' : idle)
       if (element.textContent !== label) element.textContent = label
       element.disabled = !labels.has(prompt) || game.latch > 0
     }

@@ -27,7 +27,7 @@ npm run preview
 | Interact | E | Tap the active Table, Hide, Inspect, or Latch button |
 | Restart | R | Tap Restart |
 
-After the blackout, approach the table, grab it, and move toward the entry to delay the pursuer. Interact near the hanging coats to hide or emerge. Find the balcony release pin in the sideboard. Searching the drawer or checking the deadbolt starts the entry countdown. Use the pin at the balcony and stay still until the latch opens. Cross the fire escape and read the message at the landing. If caught, **Retry blackout** starts a fresh escape attempt. After escaping, **Play again** returns to the date.
+After the blackout, approach the table, grab it, and move toward the entry to delay the pursuer. Interact near the hanging coats to hide or emerge. Find the balcony release pin in the sideboard. Searching the drawer or checking the deadbolt starts the entry countdown. Use the pin at the balcony and stay still until the latch opens. Cross the fire escape, step onto the street, and check the phone. The ending cutscene leads to a restart screen. If caught, **Retry blackout** starts a fresh escape attempt. After escaping, **Play again** returns to the date.
 
 ## Verification
 

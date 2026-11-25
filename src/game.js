@@ -4,6 +4,9 @@ export const entityTypes = [
   { name: 'Wiry shadow', voice: 'Hiss', speed: 1.2, reach: .57, recovery: 6, scale: [.94, 1.13, .95] },
 ]
 export const encounterLimit = entityTypes.length
+export const descentFadeAt = 7.7
+export const descentDuration = 9.3
+export const descentDelays = [0, 1.9, 2.8, 3.7]
 
 export const spots = {
   entry: { x: -5.2, z: -2.4 },
@@ -28,7 +31,7 @@ export function createGame() {
     phase: 'date', player: { ...start }, table: { ...tableStart },
     pursuer: { ...spots.entry }, elapsed: 0, entryAt: Infinity, reappearsAt: 0, encounters: 0,
     hidden: false, dragging: false, barricade: false, latch: 0,
-    hasPin: false, examinedLatch: false,
+    hasPin: false, examinedLatch: false, phoneRead: false, cinematicElapsed: 0,
   }
 
   function clear(x, z, actor) {
@@ -47,8 +50,9 @@ export function createGame() {
 
   function action() {
     if (game.phase === 'fireEscape') {
-      return distance(game.player, spots.landing) < .85 ? 'Read phone' : ''
+      return distance(game.player, spots.landing) < .85 ? 'Step onto street' : ''
     }
+    if (game.phase === 'street') return game.phoneRead ? 'Look up' : 'Check phone'
     if (game.phase !== 'blackout') return ''
     if (game.hidden) return 'Leave hiding spot'
     if (game.dragging) return 'Let go of table'
@@ -82,7 +86,9 @@ export function createGame() {
         break
       case 'Check deadbolt': triggerBreach(); break
       case 'Open balcony latch': game.latch ||= 2.5; break
-      case 'Read phone': game.phase = 'landing'; break
+      case 'Step onto street': game.phase = 'street'; break
+      case 'Check phone': game.phoneRead = true; break
+      case 'Look up': game.phase = 'descent'; break
       case 'Hide behind coats': game.hidden = true; game.latch = 0; break
       case 'Grab dining table': game.dragging = true; break
     }
@@ -117,6 +123,11 @@ export function createGame() {
   let waypoint
   let repath = 0
   function update(dt, inputX, inputZ) {
+    if (game.phase === 'descent') {
+      game.cinematicElapsed = Math.min(descentDuration, game.cinematicElapsed + dt)
+      if (game.cinematicElapsed >= descentDuration) game.phase = 'complete'
+      return
+    }
     const length = Math.hypot(inputX, inputZ)
     const normalizer = Math.max(1, length)
     if (game.phase === 'fireEscape') {
