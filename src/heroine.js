@@ -67,7 +67,7 @@ export function createHeroine(scene, fallback) {
     sprite.visible = ready && visible
     fallback.visible = !ready && visible
 
-    if (phase === 'date') {
+    if (phase === 'party' || phase === 'date' || phase === 'sip') {
       material.color.copy(dateLight)
     } else if (phase === 'fireEscape' || phase === 'phoneDark') {
       material.color.copy(moonLight)

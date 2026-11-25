@@ -7,6 +7,10 @@ export const encounterLimit = entityTypes.length
 export const descentFadeAt = 7.7
 export const descentDuration = 9.3
 export const descentDelays = [0, 1.9, 2.8, 3.7]
+export const partyDuration = 11.8
+export const guestDepartureTimes = [4.7, 6.1, 7.5, 9.2]
+export const sipDuration = 4.2
+export const wakeGoal = 7
 export const phoneDarkDuration = 3.2
 export const phoneRushDuration = 1.45
 export const streetProps = [
@@ -35,7 +39,7 @@ export const distance = (a, b) => Math.hypot(a.x - b.x, a.z - b.z)
 export function createGame(setbacks = {}) {
   const penalties = { entry: 0, latch: 0, darkness: 0, ...setbacks }
   const game = {
-    phase: 'date', penalties, player: { ...start }, table: { ...tableStart },
+    phase: 'party', introElapsed: 0, wakeProgress: 0, penalties, player: { ...start }, table: { ...tableStart },
     pursuer: { ...spots.entry }, elapsed: 0, entryAt: Infinity, reappearsAt: 0, encounters: 0,
     hidden: false, dragging: false, barricade: false, latch: 0,
     hasPin: false, examinedLatch: false, heardVoice: false, cinematicElapsed: 0, phoneElapsed: 0,
@@ -101,6 +105,18 @@ export function createGame(setbacks = {}) {
     }
   }
 
+  function beginSip() {
+    if (game.phase !== 'date') return
+    game.introElapsed = 0
+    game.phase = 'sip'
+  }
+
+  function beginWake() {
+    game.phase = 'waking'
+    game.elapsed = 0
+    game.entryAt = Math.max(.3, 1.55 - penalties.entry)
+  }
+
   function beginPhoneTrap() {
     if (game.phase !== 'street' || game.heardVoice) return
     game.phase = 'phoneDark'
@@ -142,7 +158,15 @@ export function createGame(setbacks = {}) {
 
   let waypoint
   let repath = 0
+  let lastShake
+  let lastShakeAt = -Infinity
   function update(dt, inputX, inputZ) {
+    if (game.phase === 'party' || game.phase === 'sip') {
+      game.introElapsed += dt
+      if (game.phase === 'party' && game.introElapsed >= partyDuration) game.phase = 'date'
+      else if (game.phase === 'sip' && game.introElapsed >= sipDuration) beginWake()
+      return
+    }
     if (game.phase === 'descent') {
       game.cinematicElapsed = Math.min(descentDuration, game.cinematicElapsed + dt)
       if (game.cinematicElapsed >= descentDuration) game.phase = 'complete'
@@ -176,9 +200,20 @@ export function createGame(setbacks = {}) {
       game.player.z = Math.max(-.65, Math.min(.65, game.player.z + inputZ * step))
       return
     }
-    if (game.phase !== 'blackout') return
+    const waking = game.phase === 'waking'
+    if (!waking && game.phase !== 'blackout') return
     game.elapsed += dt
-    if (!game.hidden && length) {
+    if (waking && game.wakeProgress < wakeGoal && length >= .48 && game.elapsed - lastShakeAt >= .075) {
+      const x = inputX / length
+      const z = inputZ / length
+      if (!lastShake || x * lastShake.x + z * lastShake.z <= -.24) {
+        if (lastShake) game.wakeProgress++
+        lastShake = { x, z }
+        lastShakeAt = game.elapsed
+      }
+    }
+    if (waking && game.wakeProgress === wakeGoal && game.elapsed - lastShakeAt >= .16) game.phase = 'blackout'
+    if (!waking && !game.hidden && length) {
       const speed = game.dragging ? 1.8 : 3.35
       const x = game.player.x
       const z = game.player.z
@@ -239,5 +274,5 @@ export function createGame(setbacks = {}) {
     return game.elapsed >= entityArrivalAt()
   }
 
-  return Object.assign(game, { action, interact, update, entityArrivalAt, entityInside, beginPhoneTrap, retryPhoneTrap })
+  return Object.assign(game, { action, interact, update, entityArrivalAt, entityInside, beginSip, beginWake, beginPhoneTrap, retryPhoneTrap })
 }

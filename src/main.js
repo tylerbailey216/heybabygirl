@@ -1,5 +1,5 @@
 import './style.css'
-import { createGame, descentDuration, descentFadeAt, encounterLimit, entityTypes, phoneRushDuration } from './game.js'
+import { createGame, descentDuration, descentFadeAt, encounterLimit, entityTypes, phoneRushDuration, sipDuration, wakeGoal } from './game.js'
 import { dateDialogue, streetDialogue } from './dialogue.js'
 import { createView } from './view.js'
 import { bindThumbstick } from './thumbstick.js'
@@ -26,6 +26,10 @@ const endingImage = document.querySelector('#ending-art')
 const endingRestart = document.querySelector('#ending-restart')
 const cinematicFade = document.querySelector('#cinematic-fade')
 const restartButton = document.querySelector('#restart')
+const wakePanel = document.querySelector('#wake-panel')
+const wakeInstructions = document.querySelector('#wake-instructions')
+const wakeMeter = document.querySelector('#wake-meter')
+wakeMeter.max = wakeGoal
 const dialogueLayer = document.querySelector('#dialogue')
 const portrait = document.querySelector('#portrait')
 const darkness = document.querySelector('#darkness')
@@ -75,7 +79,8 @@ try {
 
 function present() {
   const { phase } = game
-  const playing = phase === 'blackout' || phase === 'fireEscape' || phase === 'phoneDark'
+  const waking = phase === 'waking'
+  const playing = waking || phase === 'blackout' || phase === 'fireEscape' || phase === 'phoneDark'
   const speaking = phase === 'date' || phase === 'caught' || phase === 'phoneCaught'
   gameScreen.dataset.phase = phase
   dialogueLayer.hidden = !speaking
@@ -83,6 +88,11 @@ function present() {
   endingSplash.hidden = phase !== 'complete'
   touch.hidden = !playing || !hasTouch.matches
   if (touch.hidden) stick.reset()
+  wakePanel.hidden = !waking
+  if (waking) {
+    wakeInstructions.textContent = hasTouch.matches ? 'Shake the stick left and right' : 'Alternate A and D or the left and right arrows'
+    wakeMeter.value = game.wakeProgress
+  }
   if (speaking) {
     let prompt = dateSetback
       ? { character: 'heroine', speaker: 'You · Thinking', text: dateSetback }
@@ -100,7 +110,7 @@ function present() {
     line.textContent = prompt.text
     showChoices(dateChoices, dateButtons, prompt.options)
     advance.hidden = Boolean(prompt.options)
-    advance.textContent = phase === 'phoneCaught' ? 'Retry the street' : phase === 'caught' ? 'Retry blackout' : 'Try another answer'
+    advance.textContent = phase === 'phoneCaught' ? 'Retry the street' : phase === 'caught' ? 'Retry nightmare' : 'Try another answer'
   }
   if (phase === 'street') {
     const prompt = streetSetback
@@ -127,11 +137,11 @@ function showChoices(group, buttons, options) {
   })
 }
 
-function reset(phase = 'date') {
-  if (phase === 'blackout') enableEntityAudio()
-  game = createGame(phase === 'blackout' ? game.penalties : undefined)
-  if (phase === 'date') appliedSetbacks.clear()
-  game.phase = phase
+function reset(retryNightmare = false) {
+  if (retryNightmare) enableEntityAudio()
+  game = createGame(retryNightmare ? game.penalties : undefined)
+  if (retryNightmare) game.beginWake()
+  else appliedSetbacks.clear()
   beat = 0
   dateSetback = undefined
   streetSetback = undefined
@@ -157,7 +167,10 @@ function choose(index) {
       present()
       advance.focus()
     } else if (++beat === dateDialogue.length) {
-      reset('blackout')
+      enableEntityAudio()
+      game.beginSip()
+      navigator.vibrate?.([55, 130, 85])
+      present()
     } else {
       present()
       dateButtons[0].focus()
@@ -174,7 +187,7 @@ function choose(index) {
 }
 
 function next() {
-  if (game.phase === 'caught') return reset('blackout')
+  if (game.phase === 'caught') return reset(true)
   if (game.phase === 'phoneCaught') {
     game.retryPhoneTrap()
     present()
@@ -205,7 +218,8 @@ if (view) {
   }
   phoneAction.addEventListener('click', next)
   endingRestart.addEventListener('click', () => reset())
-  restartButton.addEventListener('click', () => reset(game.phase === 'date' ? 'date' : 'blackout'))
+  const restart = () => reset(['waking', 'blackout', 'caught', 'fireEscape'].includes(game.phase))
+  restartButton.addEventListener('click', restart)
   for (const { element, labels } of itemButtons) {
     element.addEventListener('click', () => {
       if (labels.has(game.action()) && game.latch <= 0) game.interact()
@@ -228,7 +242,7 @@ if (view) {
     if (nativeButtonClick || !['e', 'r', 'Enter', ' '].includes(key)) return
     event.preventDefault()
     if (event.repeat) return
-    if (key === 'r') reset(game.phase === 'date' || game.phase === 'complete' ? 'date' : 'blackout')
+    if (key === 'r') restart()
     else if (game.phase === 'blackout' || game.phase === 'fireEscape') game.interact()
     else next()
   })
@@ -258,15 +272,17 @@ if (view) {
     }
 
     const playing = game.phase === 'blackout'
+    const waking = game.phase === 'waking'
+    if (waking && wakeMeter.value !== game.wakeProgress) wakeMeter.value = game.wakeProgress
     const outside = game.phase === 'fireEscape'
     const phoneDark = game.phase === 'phoneDark'
     const phoneRush = game.phase === 'phoneRush'
     const prompt = game.action()
     const arrivalAt = game.entityArrivalAt()
-    const entityInside = playing && game.entityInside()
+    const entityInside = (playing || waking) && game.entityInside()
     if (entityInside && !wasInside) playEntitySound('Door')
     wasInside = entityInside
-    if (entityInside && game.elapsed >= arrivalAt + entityEntranceBeat && shownEntity !== game.encounters) {
+    if (playing && entityInside && game.elapsed >= arrivalAt + entityEntranceBeat && shownEntity !== game.encounters) {
       shownEntity = game.encounters
       entityPortrait.src = entityPortraits[shownEntity]
       entitySpeaker.textContent = entityTypes[shownEntity].name
@@ -281,12 +297,20 @@ if (view) {
       entityDialogue.hidden = true
       entityVoice.textContent = ''
     }
-    const opacity = game.phase === 'date' || phoneDark || phoneRush ? 0
+    const awakeScene = ['party', 'date', 'sip'].includes(game.phase)
+    const opacity = awakeScene || phoneDark || phoneRush ? 0
       : outside || game.phase === 'descent' ? .16 : Math.min(1, [.32, .55, .76, 1][game.encounters] + game.penalties.darkness)
-    const fade = game.phase === 'descent'
+    let fade = game.phase === 'descent'
       ? Math.max(0, Math.min(1, (game.cinematicElapsed - descentFadeAt) / (descentDuration - descentFadeAt - .4)))
       : phoneRush ? Math.max(0, (game.phoneElapsed - phoneRushDuration + .22) / .22)
         : Number(game.phase === 'complete')
+    if (game.phase === 'sip') {
+      const t = game.introElapsed
+      const pulse = Math.sin(Math.PI * (t - .65) / 1.14) ** 2
+      fade = t < .65 ? 0 : t < 2.93 ? pulse * .86 : Math.min(1, (t - 2.93) / (sipDuration - 3.28))
+    } else if (waking) {
+      fade = Math.max(0, 1 - game.elapsed / .75)
+    }
     cinematicFade.style.opacity = fade
     if (previousDarkness !== opacity) {
       darkness.style.opacity = opacity
@@ -313,12 +337,12 @@ if (view) {
       : playing ? `${timing} · ${hint}${encounters}` : ''
     if (message !== status.textContent) status.textContent = message
     for (const { element, labels, idle, outside: outdoorButton } of itemButtons) {
-      element.hidden = phoneDark || (outside && !outdoorButton)
+      element.hidden = waking || phoneDark || (outside && !outdoorButton)
       const label = labels.get(prompt) ?? (outside ? 'Street' : idle)
       if (element.textContent !== label) element.textContent = label
       element.disabled = !labels.has(prompt) || game.latch > 0
     }
-    view.render(game, now / 1000, beat >= 2)
+    view.render(game, now / 1000, game.phase === 'date' && Boolean(dateDialogue[beat]?.offscreen))
     requestAnimationFrame(frame)
   }
   requestAnimationFrame(frame)

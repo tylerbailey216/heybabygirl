@@ -1,5 +1,5 @@
 import * as T from 'three'
-import { descentDelays, entityTypes, phoneRushDuration, spots, streetProps } from './game.js'
+import { descentDelays, entityTypes, guestDepartureTimes, partyDuration, phoneRushDuration, spots, streetProps } from './game.js'
 import { createHeroine } from './heroine.js'
 import woodUrl from './assets/wood.webp'
 import plasterUrl from './assets/plaster.webp'
@@ -255,15 +255,15 @@ export function createView(container) {
   moon.position.set(3.3, 2.1, -4.4)
   scene.add(ambient, ceiling, moon)
 
-  function character(kind) {
+  function character(kind, palette = {}) {
     const group = new T.Group()
     scene.add(group)
     const heroine = kind === 'heroine'
     const shadow = kind === 'shadow'
-    const skin = heroine ? '#8d543c' : shadow ? '#08060c' : '#c48c6d'
-    const top = heroine ? '#f49cae' : shadow ? skin : '#789680'
+    const skin = heroine ? '#8d543c' : shadow ? '#08060c' : palette.skin ?? '#c48c6d'
+    const top = heroine ? '#f49cae' : shadow ? skin : palette.shirt ?? '#789680'
     const jeans = heroine ? '#4278ab' : shadow ? skin : '#3b364d'
-    const hair = heroine ? '#ad573b' : '#302332'
+    const hair = heroine ? '#ad573b' : palette.hair ?? '#302332'
     const legs = []
     for (const x of [-.13, .13]) {
       const leg = new T.Group()
@@ -308,6 +308,34 @@ export function createView(container) {
   const poseHeroine = createHeroine(scene, player.group)
   const heroineShadow = contact(room, 0, 0, 1.05, .65, .75)
   const date = character('date')
+  const guestPositions = [
+    { x: 2.4, z: -.1, shirt: '#a6556d', skin: '#87573e', hair: '#242127', scale: 1.07 },
+    { x: -3.75, z: -.1, shirt: '#4a7790', skin: '#d79777', hair: '#845133', scale: .92 },
+    { x: 3.85, z: -2.05, shirt: '#a48050', skin: '#a97152', hair: '#3f2429', scale: 1.01 },
+    { x: -4.6, z: -1.15, shirt: '#694d8c', skin: '#a66e50', hair: '#37253b', scale: 1.12 },
+    { x: -2.35, z: .68, shirt: '#98565b', skin: '#794c3e', hair: '#242126', scale: .95 },
+    { x: 4.62, z: 1.05, shirt: '#507f73', skin: '#cf8a63', hair: '#472b27', scale: 1.04 },
+    { x: .55, z: -2.7, shirt: '#746c9e', skin: '#e0a482', hair: '#663b34', scale: .98 },
+  ]
+  const guests = guestPositions.map((spec, index) => {
+    const actor = character('guest', spec)
+    actor.group.scale.setScalar(spec.scale)
+    actor.group.visible = false
+    return { actor, spec, departure: guestDepartureTimes[index - 3] ?? Infinity }
+  })
+  const partyLight = new T.PointLight('#ff688f', 18, 7.5, 2)
+  partyLight.position.set(2, 2.9, 1)
+  room.add(partyLight)
+  const partyFill = new T.PointLight('#ad86ff', 14, 8, 2)
+  partyFill.position.set(-3, 2.2, -.5)
+  room.add(partyFill)
+  const dreamLight = new T.PointLight('#9470ff', 0, 5, 2)
+  dreamLight.position.set(-4.55, 1.95, -2.28)
+  room.add(dreamLight)
+  const drink = shape(room, new T.CylinderGeometry(.074, .058, .19, 10), '#e3b385', .24, 1.05, 1.17, false)
+  drink.material = new T.MeshBasicMaterial({ color: '#e1ac7c', depthTest: false, depthWrite: false, transparent: true })
+  drink.renderOrder = 11
+
   function createShadow() {
     const actor = character('shadow')
     const wisps = Array.from({ length: 8 }, () => {
@@ -452,7 +480,13 @@ export function createView(container) {
 
   function render(game, time, dateOffscreen) {
     if (game.phase === 'street' || game.phase === 'complete' || game.phase === 'phoneCaught') return
-    const blackout = game.phase !== 'date'
+    const party = game.phase === 'party'
+    const sip = game.phase === 'sip'
+    const waking = game.phase === 'waking'
+    const partyScene = party || sip || game.phase === 'date'
+    const blackout = !partyScene
+    const dreaming = waking || game.phase === 'blackout'
+    const night = party ? Math.min(1, game.introElapsed / partyDuration) : 1
     const cinematic = game.phase === 'descent'
     const outside = game.phase === 'fireEscape' || cinematic
     const phoneDark = game.phase === 'phoneDark'
@@ -468,6 +502,11 @@ export function createView(container) {
       camera.position.set(0, 2.15, 5.65)
       camera.lookAt(0, .63, -1.2)
       camera.zoom = 1.8
+    } else if (party || sip) {
+      const drift = party && !reducedMotion.matches ? Math.sin(game.introElapsed * .22) * .75 : 0
+      camera.position.set(drift, 12.7, 10.4)
+      camera.lookAt(drift, .2, -.32)
+      camera.zoom = sip ? 1.23 : 1.01
     } else if (cinematic) {
       camera.position.set(pan, 7.8, 11.4)
       camera.lookAt(pan, .16, 0)
@@ -478,7 +517,7 @@ export function createView(container) {
       camera.zoom = 1
     }
     camera.updateProjectionMatrix()
-    const inside = game.phase === 'blackout' && game.entityInside()
+    const inside = (game.phase === 'blackout' || waking) && game.entityInside()
     const ground = outside ? floorHeight(game.player.x) : 0
     room.visible = !outside && !trap
     fireEscape.visible = outside
@@ -492,19 +531,45 @@ export function createView(container) {
       phoneLight.position.set(game.player.x, 1.03, game.player.z - .22)
       phonePool.position.set(game.player.x, .008, game.player.z)
     }
-    ceiling.intensity = blackout ? .04 : 2.05
-    ambient.intensity = trap ? .022 : blackout ? .31 : 1.18
-    moon.intensity = trap ? 0 : blackout ? 26 : 15
-    const candleLit = !blackout || !game.penalties.darkness
+    ceiling.intensity = blackout ? .04 : 2.1 - night * 1.15
+    ambient.intensity = trap ? .022 : blackout ? .31 : 1.21 - night * .38
+    moon.intensity = trap ? 0 : blackout ? 26 : 12 + night * 9
+    partyLight.intensity = partyScene ? (1 - night * .78) * (18 + Math.sin(time * 4.4) * 4) : 0
+    dreamLight.intensity = dreaming ? 8 + Math.sin(time * 2.8) * 1.45 : 0
+    partyFill.intensity = partyScene ? (1 - night * .7) * (14 + Math.sin(time * 3.2 + 1) * 3) : 0
+    const candleLit = (party || !game.penalties.darkness)
     flame.visible = candleLit
     candle.intensity = candleLit ? (blackout ? 23 : 11) + Math.sin(time * 19) * 1.4 + Math.sin(time * 8) * 1.2 : 0
     flame.scale.y = 1 + Math.sin(time * 16) * .13
     table.position.set(game.table.x, 0, game.table.z)
     const burst = inside ? Math.min(1, (game.elapsed - game.entityArrivalAt()) / .28) : 0
     const swing = 1 - (1 - burst) ** 3 + Math.sin(burst * Math.PI) * .19
-    door.rotation.y = -1.17 * swing
+    const partyDoorOpen = party && guestDepartureTimes.some(end => game.introElapsed > end - .45 && game.introElapsed < end + .27)
+    door.rotation.y = partyDoorOpen ? -.92 : -1.17 * swing
     glass.position.x = outside ? -1.35 : 0
-    date.group.visible = !blackout && !dateOffscreen
+    date.group.visible = partyScene && !dateOffscreen
+    date.group.position.set(sip ? .95 : .3, 0, sip ? .15 : -2.23)
+    date.group.rotation.y = sip ? -.7 : -.3
+    for (const [index, { actor, spec, departure }] of guests.entries()) {
+      actor.group.visible = partyScene && (index < 3 || (party && game.introElapsed < departure))
+      if (!actor.group.visible) continue
+      const leave = party ? Math.max(0, 1 - (departure - game.introElapsed) / 1.4) : 0
+      const sway = Math.sin(time * (1.6 + index * .14) + index) * (.19 - night * .12)
+      const x = T.MathUtils.lerp(spec.x + sway, spots.entry.x, leave)
+      const z = T.MathUtils.lerp(spec.z + Math.cos(time * 1.65 + index) * .11, spots.entry.z, leave)
+      actorPose(actor, { x, z }, time * .56)
+      if (!leave) {
+        actor.group.rotation.y = Math.sin(time * 1.3 + index) * .38 + (index % 2 ? -.52 : .56)
+        actor.legs[0].rotation.x *= .13
+        actor.legs[1].rotation.x *= .13
+      }
+    }
+    drink.visible = sip && game.introElapsed < 1.55
+    if (drink.visible) {
+      const lift = Math.sin(Math.min(1, game.introElapsed / 1.55) * Math.PI)
+      drink.position.set(.26 - lift * .18, 1.02 + lift * .5, 1.18)
+      drink.rotation.z = -.21 * lift
+    }
     pursuer.group.visible = inside || phoneRush
     actorPose(player, game.player, time)
     player.group.position.y = ground

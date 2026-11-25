@@ -275,3 +275,42 @@ kbd{border:1px solid #bd8f8170;border-radius:4px;padding:.1rem .3rem;margin-left
 
 #game:is([data-phase="phoneDark"],[data-phase="phoneRush"],[data-phase="phoneCaught"]) :is(header,footer){visibility:hidden}
 #game[data-phase="phoneCaught"] #scene{visibility:hidden}
+
+#wake-panel{
+  position:absolute;
+  top:clamp(82px,16dvh,150px);
+  left:50%;
+  z-index:2;
+  transform:translateX(-50%);
+  width:min(86%,390px);
+  padding:.78rem 1rem;
+  border:1px solid #9776d7;
+  border-radius:8px;
+  background:#0d081bd9;
+  box-shadow:0 0 25px #5722ab66;
+  text-align:center;
+  pointer-events:none;
+}
+#wake-title{color:#f0dcff;font-size:clamp(1.4rem,6vw,2rem)}
+#wake-instructions{margin:.25rem 0 .6rem;color:#e0d4f4;font-size:.92rem}
+#wake-meter{display:block;width:100%;height:.75rem;accent-color:#b3a1ff}
+#game[data-phase="waking"] #thumbstick{border-color:#bc9eff;box-shadow:0 0 24px #8253d6aa}
+#game:is([data-phase="party"],[data-phase="sip"]) footer{visibility:hidden}
+#game[data-phase="sip"] #scene{animation:sip-shake 1.05s .55s ease-in-out 3}
+#game:is([data-phase="waking"],[data-phase="blackout"]) #scene canvas{
+  filter:contrast(1.22) saturate(.78);
+}
+#game[data-phase="waking"] #scene canvas{animation:dream-focus 2.7s ease-in-out infinite alternate}
+@keyframes sip-shake{
+  0%,100%{transform:translate(0) scale(1.025)}
+  23%{transform:translate(-2px,1px) scale(1.025)}
+  47%{transform:translate(3px,-1px) scale(1.025)}
+  71%{transform:translate(-2px,2px) scale(1.025)}
+}
+@keyframes dream-focus{
+  from{filter:contrast(1.22) saturate(.65) blur(.1px)}
+  to{filter:contrast(1.43) saturate(.8) blur(1.1px)}
+}
+@media(prefers-reduced-motion:reduce){
+  #game[data-phase="sip"] #scene,#game[data-phase="waking"] #scene canvas{animation:none}
+}

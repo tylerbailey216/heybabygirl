@@ -13,6 +13,11 @@
   <header><div><p class="eyebrow">BLACKOUT DATE</p><h1>Hey Baby Girl<span>.</span></h1></div><button id="restart" type="button" aria-label="Restart game">Restart</button></header>
   <div id="status" aria-live="polite"></div>
   <div id="markers" aria-hidden="true"></div>
+  <section id="wake-panel" aria-labelledby="wake-title" hidden>
+    <h2 id="wake-title">Wake up</h2>
+    <p id="wake-instructions"></p>
+    <progress id="wake-meter" aria-labelledby="wake-title" value="0"></progress>
+  </section>
   <div id="dialogue" class="dialogue-layer">
     <img id="portrait" class="dialogue-portrait" alt="" hidden>
     <section id="panel" class="dialogue-panel" aria-live="polite">
