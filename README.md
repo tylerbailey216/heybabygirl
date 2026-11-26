@@ -9,6 +9,8 @@ milestone synchronization notes.
 
 Use Node.js 20.19+, 22.12+, or a supported newer release, and a browser with WebGL 2.
 
+On the audio workstation, Node is also installed locally in `.local-node`. From this folder, start the game with `PATH="$PWD/.local-node/bin:$PATH" npm run dev`, open the printed local address, and press Ctrl+C to stop the server. The runtime and dependencies are not committed.
+
 ```sh
 npm ci
 npm run dev
