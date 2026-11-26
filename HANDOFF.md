@@ -152,3 +152,12 @@ flows, and the new chevron/daily accessibility browser flow passed. Mobile
 chevron capture reviewed. Old short-course bests reset through scoreVersion 2;
 unlocks, seen entities and examined locations persist. Physical-phone feel and
 performance remain unverified.
+
+### Street obstacle collision repair
+
+The expanded street rendered four copies of the Blender kit while simulation
+only blocked the original two props. Renderer and simulation now share block
+offsets, and all repeated bin/collection-box footprints block the player. Street
+movement is subdivided to prevent frame-time tunnelling and retains axis sliding.
+Regression coverage checks every reachable copy, diagonal sliding, and a clear
+route around each object. All 14 simulation checks and production build pass.

@@ -19,10 +19,13 @@ export const phoneRushDuration = 1.45
 export const streetLightFade = 1.6
 export const streetWakeSeconds = 7
 export const streetIntersection = { x: 62, z: .3 }
-export const streetProps = [
-  { x: -1.9, z: -.95, w: .65, d: .6 },
-  { x: 1.75, z: -.65, w: .72, d: .7 },
-]
+// Shared with the renderer: every repeated street block needs matching collision.
+export const streetBlockOffsets = [0, 21, 42, 63]
+export const streetProps = streetBlockOffsets.flatMap(offset => [
+  { x: offset - 1.9, z: -.95, w: .65, d: .6 },
+  { x: offset + 1.75, z: -.65, w: .72, d: .7 },
+])
+
 
 export const spots = {
   entry: { x: -5.2, z: -2.4 },
@@ -190,8 +193,12 @@ export function createGame(setbacks = {}, options = {}) {
     const open = (x, z) => x >= Math.max(-3.7, -maxX) && x <= maxX && z >= -1.55 && z <= 2
       && !streetProps.some(prop => Math.abs(x - prop.x) < prop.w / 2 + .22
         && Math.abs(z - prop.z) < prop.d / 2 + .22)
-    if (open(player.x + dx, player.z)) player.x += dx
-    if (open(player.x, player.z + dz)) player.z += dz
+    // Small steps prevent a long frame from tunnelling through a narrow prop.
+    const steps = Math.max(1, Math.ceil(Math.max(Math.abs(dx), Math.abs(dz)) / .1))
+    for (let i = 0; i < steps; i++) {
+      if (open(player.x + dx / steps, player.z)) player.x += dx / steps
+      if (open(player.x, player.z + dz / steps)) player.z += dz / steps
+    }
   }
 
   // Use a small navigation grid so the pursuer can go around furniture.

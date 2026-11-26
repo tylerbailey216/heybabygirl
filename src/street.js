@@ -1,7 +1,7 @@
 import * as T from 'three'
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js'
-import { streetIntersection } from './game.js'
+import { streetIntersection, streetBlockOffsets } from './game.js'
 import kitUrl from './assets/models/street-kit.glb?url'
 
 export function dressStreet(group) {
@@ -30,7 +30,7 @@ export function dressStreet(group) {
   map.wrapS = map.wrapT = T.RepeatWrapping
   map.repeat.set(6, 5)
   const roadMaterial = new T.MeshStandardMaterial({ map, roughness: .42, metalness: .18 })
-  new GLTFLoader().load(kitUrl, ({ scene }) => { for (let i = 0; i < 4; i++) { const block = scene.clone(true); block.position.x = i * 21; group.add(block) } }, undefined, error => console.error('Street kit unavailable', error))
+  new GLTFLoader().load(kitUrl, ({ scene }) => { for (const offset of streetBlockOffsets) { const block = scene.clone(true); block.position.x = offset; group.add(block) } }, undefined, error => console.error('Street kit unavailable', error))
 
   const paving = new T.MeshStandardMaterial({ color: '#57505b', roughness: .64 })
   const slabs = new T.InstancedMesh(new RoundedBoxGeometry(.68, .1, .82, 1, .025), paving, 208)

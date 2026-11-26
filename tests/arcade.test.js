@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { createGame, newSetup, pinLocations, spots } from '../src/game.js'
+import { createGame, newSetup, pinLocations, spots, streetProps } from '../src/game.js'
 import { loadProgress, saveProgress, recordEscape, scoreRun, dailySetup } from '../src/arcade.js'
 import { nightmareBeat } from '../src/nightmare.js'
 import { phoneBrightness } from '../src/phone.js'
@@ -234,4 +234,23 @@ test('daily challenge is stable in UTC and examination knowledge survives reload
   const progress = loadProgress(storage); progress.known.push('Apartment')
   saveProgress(storage, progress)
   assert.deepEqual(loadProgress(storage).known, ['Apartment'])
+})
+
+
+test('every rendered street block obstructs movement and allows sliding around props', () => {
+  for (const prop of streetProps.filter(p => p.x > -3 && p.x < 62)) {
+    const game = createGame()
+    game.phase = 'streetRun'
+    game.pursuer = { x: -100, z: 0 }
+    game.player = { x: prop.x - prop.w / 2 - .5, z: prop.z }
+    // Even a long movement frame must stop on the near side.
+    game.update(.5, 1, 0)
+    assert.ok(game.player.x <= prop.x - prop.w / 2 - .22 + 1e-8, `blocked at ${prop.x}`)
+    const stoppedX = game.player.x
+    game.update(.2, 1, 1)
+    assert.ok(game.player.z > prop.z, 'diagonal input slides along the obstacle')
+    for (let i = 0; i < 12; i++) game.update(.05, 0, 1)
+    for (let i = 0; i < 12; i++) game.update(.05, 1, 0)
+    assert.ok(game.player.x > stoppedX + 1, 'open route around obstacle remains usable')
+  }
 })
