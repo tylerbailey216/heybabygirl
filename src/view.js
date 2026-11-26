@@ -528,7 +528,7 @@ export function createView(container) {
   }
 
   function render(game, time, dateOffscreen) {
-    if (game.phase === 'street' || game.phase === 'complete' || game.phase === 'phoneCaught' || game.phase === 'returnCaught') return
+    if (game.phase === 'breachIntro' || game.phase === 'street' || game.phase === 'complete' || game.phase === 'phoneCaught' || game.phase === 'returnCaught') return
     const party = game.phase === 'party'
     const sip = game.phase === 'sip'
     const waking = game.phase === 'waking'

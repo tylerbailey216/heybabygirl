@@ -128,6 +128,14 @@ export function createGame(setbacks = {}) {
     game.phase = 'sip'
   }
 
+  let breachResume
+  let breachSeen = false
+  function continueBreach() {
+    if (game.phase !== 'breachIntro') return
+    game.phase = breachResume
+    breachSeen = true
+  }
+
   function beginWake() {
     game.phase = 'waking'
     game.elapsed = 0
@@ -282,6 +290,12 @@ export function createGame(setbacks = {}) {
     }
     const waking = game.phase === 'waking'
     if (!waking && game.phase !== 'blackout') return
+    if (!breachSeen && game.elapsed + dt >= game.entryAt) {
+      game.elapsed = game.entryAt
+      breachResume = game.phase
+      game.phase = 'breachIntro'
+      return
+    }
     game.elapsed += dt
     if (waking) shake(inputX, inputZ, length, game.elapsed)
     if (waking && game.wakeProgress === wakeGoal && game.elapsed - lastShakeAt >= .16) game.phase = 'blackout'
@@ -343,8 +357,8 @@ export function createGame(setbacks = {}) {
   }
 
   function entityInside() {
-    return game.elapsed >= entityArrivalAt()
+    return game.phase !== 'breachIntro' && game.elapsed >= entityArrivalAt()
   }
 
-  return Object.assign(game, { action, interact, update, entityArrivalAt, entityInside, beginSip, beginWake, beginPhoneTrap, retryStreet, retryFireEscape })
+  return Object.assign(game, { action, interact, update, entityArrivalAt, entityInside, continueBreach, beginSip, beginWake, beginPhoneTrap, retryStreet, retryFireEscape })
 }

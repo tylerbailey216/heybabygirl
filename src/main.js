@@ -11,8 +11,12 @@ import heavyPortrait from './assets/shadow-heavy.webp'
 import wiryPortrait from './assets/shadow-wiry.webp'
 import streetArt from './assets/ending-phone.webp'
 import splashArt from './assets/ending-splash.webp'
+import breachArt from './assets/breach-intro.webp'
 
 const gameScreen = document.querySelector('#game')
+const breachSplash = document.querySelector('#breach-splash')
+const breachImage = document.querySelector('#breach-art')
+const breachContinue = document.querySelector('#breach-continue')
 const streetEnding = document.querySelector('#street-ending')
 const streetImage = document.querySelector('#street-art')
 const phoneMessage = document.querySelector('#phone-message')
@@ -34,10 +38,8 @@ wakeMeter.max = wakeGoal
 const dialogueLayer = document.querySelector('#dialogue')
 const portrait = document.querySelector('#portrait')
 const darkness = document.querySelector('#darkness')
-const entityDialogue = document.querySelector('#entity-dialogue')
+const entityCue = document.querySelector('#entity-cue')
 const entityPortrait = document.querySelector('#entity-portrait')
-const entityVoice = document.querySelector('#entity-voice')
-const entitySpeaker = document.querySelector('#entity-speaker')
 const entityPortraits = [tallPortrait, heavyPortrait, wiryPortrait]
 let shownEntity = -1
 let voiceEndsAt = 0
@@ -58,6 +60,7 @@ const itemButtons = [
 ]
 const stick = bindThumbstick(document.querySelector('#thumbstick'))
 const status = document.querySelector('#status')
+const statusLine = document.querySelector('#status-line')
 const hasTouch = matchMedia('(any-pointer: coarse)')
 const portraits = { date: datePortrait, heroine: heroinePortrait }
 const appliedSetbacks = new Set()
@@ -85,6 +88,7 @@ function present() {
   const speaking = phase === 'date' || phase === 'caught' || phase === 'phoneCaught' || phase === 'streetSafe' || phase === 'returnCaught'
   gameScreen.dataset.phase = phase
   dialogueLayer.hidden = !speaking
+  breachSplash.hidden = phase !== 'breachIntro'
   streetEnding.hidden = phase !== 'street'
   endingSplash.hidden = phase !== 'complete'
   touch.hidden = !playing || !hasTouch.matches
@@ -156,8 +160,7 @@ function reset(retryNightmare = false) {
   shownEntity = -1
   voiceEndsAt = 0
   wasInside = false
-  entityDialogue.hidden = true
-  entityVoice.textContent = ''
+  entityCue.hidden = true
   held.clear()
   stick.reset()
   present()
@@ -195,6 +198,13 @@ function choose(index) {
 }
 
 function next() {
+  if (game.phase === 'breachIntro') {
+    held.clear()
+    stick.reset()
+    game.continueBreach()
+    present()
+    return
+  }
   if (game.phase === 'returnCaught') {
     game.retryFireEscape()
     held.clear()
@@ -226,17 +236,19 @@ function next() {
 
 const movement = new Set(['w', 'a', 's', 'd', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'])
 if (view) {
+  breachImage.src = breachArt
   streetImage.src = streetArt
   endingImage.src = splashArt
   present()
   advance.addEventListener('click', next)
+  breachContinue.addEventListener('click', next)
   for (const buttons of [dateButtons, streetButtons]) {
     buttons.forEach((button, index) => button.addEventListener('click', () => choose(index)))
   }
   phoneAction.addEventListener('click', next)
   endingRestart.addEventListener('click', () => reset())
   const restart = () => {
-    if (game.phase === 'returnNightmare') return
+    if (game.phase === 'returnNightmare' || game.phase === 'breachIntro') return
     if (game.phase === 'returnCaught') next()
     else reset(['waking', 'blackout', 'caught', 'fireEscape'].includes(game.phase))
   }
@@ -291,11 +303,15 @@ if (view) {
       displayedPhase = game.phase
       present()
       if (!dialogueLayer.hidden) (advance.hidden ? dateButtons[0] : advance).focus()
-      else if (game.phase === 'street') streetButtons[0].focus()
+      else if (game.phase === 'breachIntro') {
+        breachContinue.focus()
+        shownEntity = game.encounters
+        playEntitySound(entityTypes[shownEntity].voice)
+      } else if (game.phase === 'street') streetButtons[0].focus()
       else if (game.phase === 'complete') endingRestart.focus()
       if (game.phase === 'phoneRush' || game.phase === 'streetRun') playEntitySound('Hiss')
       if (game.phase === 'returnNightmare') playEntitySound('Growl')
-      if (game.phase === 'streetRun' || game.phase === 'returnNightmare') {
+      if (game.phase === 'streetRun' || game.phase === 'returnNightmare' || game.phase === 'breachIntro') {
         held.clear()
         stick.reset()
       }
@@ -322,18 +338,11 @@ if (view) {
     if (playing && entityInside && game.elapsed >= arrivalAt + entityEntranceBeat && shownEntity !== game.encounters) {
       shownEntity = game.encounters
       entityPortrait.src = entityPortraits[shownEntity]
-      entitySpeaker.textContent = entityTypes[shownEntity].name
-      entityDialogue.hidden = false
-      const voice = entityTypes[shownEntity].voice
-      entityVoice.textContent = `[${voice}]`
-      playEntitySound(voice)
-      voiceEndsAt = game.elapsed + 2.7
+      playEntitySound(entityTypes[shownEntity].voice)
+      voiceEndsAt = game.elapsed + 1.8
     }
-    const showEntityDialogue = entityInside && game.elapsed < voiceEndsAt
-    if (!showEntityDialogue && !entityDialogue.hidden) {
-      entityDialogue.hidden = true
-      entityVoice.textContent = ''
-    }
+    const activeCue = playing && entityInside && game.elapsed < voiceEndsAt
+    entityCue.hidden = !activeCue
     const awakeScene = ['party', 'date', 'sip'].includes(game.phase)
     const opacity = awakeScene || phoneDark || phoneRush || streetDazed || streetRun || game.phase === 'streetSafe' ? 0
       : outside || game.phase === 'descent' ? .16 : Math.min(1, [.32, .55, .76, 1][game.encounters] + game.penalties.darkness)
@@ -360,7 +369,10 @@ if (view) {
     }
     const secondsToArrival = Math.ceil(arrivalAt - game.elapsed)
     let timing = 'The power is out'
-    if (entityInside) timing = 'It’s inside'
+    if (activeCue) {
+      const entity = entityTypes[shownEntity]
+      timing = `${entity.name} [${entity.voice}]`
+    } else if (entityInside) timing = 'It’s inside'
     else if (Number.isFinite(secondsToArrival)) {
       timing = `${game.encounters ? 'Returns' : 'Door bursts open'} in ${secondsToArrival}s`
     }
@@ -376,7 +388,8 @@ if (view) {
     const encounters = game.encounters ? ` · Encounters ${game.encounters}/${encounterLimit}` : ''
     const message = streetRun ? 'Run right · Reach the lit intersection' : outside ? (prompt ? 'Street level · Step down' : 'Fire escape · Follow the stairs to the right')
       : playing ? `${timing} · ${hint}${encounters}` : ''
-    if (message !== status.textContent) status.textContent = message
+    if (message !== statusLine.textContent) statusLine.textContent = message
+    status.hidden = !message
     for (const { element, labels, idle, outside: outdoorButton } of itemButtons) {
       element.hidden = waking || streetDazed || streetRun || phoneDark || (outside && !outdoorButton)
       const label = labels.get(prompt) ?? (outside ? 'Street' : idle)

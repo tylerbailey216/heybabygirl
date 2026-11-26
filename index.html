@@ -11,7 +11,10 @@
   <div id="scene" aria-hidden="true"></div>
   <div id="darkness" aria-hidden="true"></div>
   <header><div><p class="eyebrow">BLACKOUT DATE</p><h1>Hey Baby Girl<span>.</span></h1></div><button id="restart" type="button" aria-label="Restart game">Restart</button></header>
-  <div id="status" aria-live="polite"></div>
+  <div id="status" aria-live="polite" hidden>
+    <span id="entity-cue" hidden><img id="entity-portrait" alt=""></span>
+    <span id="status-line"></span>
+  </div>
   <div id="markers" aria-hidden="true"></div>
   <section id="wake-panel" aria-labelledby="wake-title" hidden>
     <h2 id="wake-title">Wake up</h2>
@@ -34,13 +37,6 @@
       <button id="continue" type="button" hidden></button>
     </section>
   </div>
-  <div id="entity-dialogue" class="dialogue-layer" hidden>
-    <img id="entity-portrait" class="dialogue-portrait" alt="">
-    <section class="dialogue-panel entity-panel" aria-live="polite">
-      <p id="entity-speaker" class="eyebrow"></p>
-      <h2 id="entity-voice"></h2>
-    </section>
-  </div>
   <div id="touch" hidden>
     <div id="thumbstick" role="img" aria-label="Movement thumbstick"><span></span></div>
     <div class="actions" role="group" aria-label="Item actions">
@@ -50,6 +46,13 @@
       <button id="latch-action" type="button" disabled>Latch</button>
     </div>
   </div>
+  <section id="breach-splash" role="dialog" aria-modal="true" aria-labelledby="breach-title" hidden>
+    <img id="breach-art" alt="The heroine turns toward a red-eyed shadow in the apartment doorway">
+    <div class="breach-content">
+      <h2 id="breach-title">It’s inside.</h2>
+      <button id="breach-continue" type="button">Continue</button>
+    </div>
+  </section>
   <section id="street-ending" aria-labelledby="street-title" hidden>
     <img id="street-art" alt="The heroine checking her phone on an empty, rain-soaked street">
     <div class="street-message">
