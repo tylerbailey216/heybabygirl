@@ -1,4 +1,6 @@
 import * as T from 'three'
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
+import lampUrl from './assets/models/floor-lamp.glb?url'
 import { descentDelays, entityTypes, guestDepartureTimes, partyDuration, phoneRushDuration, returnReachAt, spots, streetIntersection, streetLightFade, streetProps } from './game.js'
 import { createHeroine } from './heroine.js'
 import woodUrl from './assets/wood.webp'
@@ -15,6 +17,8 @@ export function createView(container) {
   const renderer = new T.WebGLRenderer({ antialias: true })
   renderer.setPixelRatio(Math.min(devicePixelRatio, 1.75))
   renderer.outputColorSpace = T.SRGBColorSpace
+  renderer.toneMapping = T.ACESFilmicToneMapping
+  renderer.toneMappingExposure = 1.15
   container.append(renderer.domElement)
 
   const gradient = new T.DataTexture(new Uint8Array([83, 119, 155, 195, 231, 255]), 6, 1, T.RedFormat)
@@ -254,6 +258,27 @@ export function createView(container) {
   const moon = new T.PointLight('#719eff', 29, 9, 2)
   moon.position.set(3.3, 2.1, -4.4)
   scene.add(ambient, ceiling, moon)
+
+  // A practical light keeps the apartment recognisable after the party dies.
+  const practical = new T.PointLight('#ffc17d', 14, 6, 2)
+  practical.position.set(4.8, 1.48, 2.85)
+  room.add(practical)
+  new GLTFLoader().load(lampUrl, ({ scene: lamp }) => {
+    lamp.position.set(4.8, 0, 2.85)
+    room.add(lamp)
+  }, undefined, error => console.error('Apartment lamp failed to load', error))
+
+  // Narrow moonlit stripes suggest blinds without adding shadow-map cost.
+  const stripes = new T.Group()
+  room.add(stripes)
+  for (let i = 0; i < 7; i++) {
+    const stripe = new T.Mesh(new T.PlaneGeometry(.085, 2.8), new T.MeshBasicMaterial({
+      color: '#8faec9', transparent: true, opacity: .09, depthWrite: false,
+    }))
+    stripe.rotation.set(-Math.PI / 2, 0, -.32)
+    stripe.position.set(2.4 + i * .25, .065, -2.1)
+    stripes.add(stripe)
+  }
 
   function character(kind, palette = {}) {
     const group = new T.Group()
@@ -536,6 +561,11 @@ export function createView(container) {
     setRoomInverted(returning)
     const partyScene = party || sip || game.phase === 'date'
     const blackout = !partyScene
+    // Slow electrical instability, with a steady alternative for reduced motion.
+    const unease = reducedMotion.matches ? 1 : .91 + Math.sin(time * 1.7) * .05 + Math.sin(time * 3.1) * .04
+    practical.intensity = returning ? .35 : (blackout ? 3.6 : 15) * unease
+    practical.color.set(blackout ? '#a7b8a0' : '#ffc17d')
+    stripes.visible = blackout
     const dreaming = waking || returning || game.phase === 'blackout'
     const night = party ? Math.min(1, game.introElapsed / partyDuration) : 1
     const cinematic = game.phase === 'descent'

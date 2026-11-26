@@ -4,6 +4,9 @@ A first playable 3D browser demo. An apartment party fades into a nightmare afte
 
 ## Run locally
 
+See [HANDOFF.md](HANDOFF.md) for local development, Blender asset generation, and
+milestone synchronization notes.
+
 Use Node.js 20.19+, 22.12+, or a supported newer release, and a browser with WebGL 2.
 
 ```sh

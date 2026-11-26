@@ -15,6 +15,10 @@ let lastRoomSound = -1
 let lastRaining
 let previousStep
 let distanceSinceStep = 0
+let roomTone
+let nextCreak = 0
+let nextPulse = 0
+let creakIndex = 0
 
 const rainyPhases = new Set(['fireEscape', 'street', 'streetDazed', 'streetRun', 'streetSafe', 'phoneDark', 'phoneRush', 'descent'])
 const beatInterval = .29
@@ -76,6 +80,7 @@ export function enableEntityAudio() {
       return vowel * syllable ** 3 * .14 + distant * .09
     }), 'bandpass', 455, 1.4)
     rain = bed(makeNoise(4.4, t => .72 + .17 * Math.sin(t * 2.15) + .09 * Math.sin(t * 8)), 'highpass', 860, .45)
+    roomTone = bed(makeNoise(5.3, t => .55 + .12 * Math.sin(t * 1.3)), 'lowpass', 145, .6)
   }
   if (context.state !== 'running' && context.state !== 'closed') context.resume().catch(() => {})
 }
@@ -137,6 +142,9 @@ export function updateSceneAudio(game) {
     lastGame = game
     previousStep = undefined
     distanceSinceStep = 0
+    nextCreak = now + 4.5
+    nextPulse = now + 1
+    creakIndex = 0
     if (phase === 'party') {
       beat = 0
       nextBeat = now
@@ -156,6 +164,28 @@ export function updateSceneAudio(game) {
     lastRoomSound = roomSound
   }
   const raining = rainyPhases.has(phase)
+  const uneasyRoom = phase === 'waking' || phase === 'blackout' || phase === 'returnNightmare'
+  if (changed) roomTone.gain.setTargetAtTime(uneasyRoom ? .075 : 0, now, .8)
+  if (uneasyRoom && now >= nextCreak) {
+    // Alternate sides: the room has a presence even before the door opens.
+    const pan = context.createStereoPanner()
+    pan.pan.value = creakIndex % 2 ? .72 : -.72
+    pan.connect(master)
+    tone('sine', 173, 119, .032, now, 1.3, pan)
+    tone('triangle', 89, 67, .018, now + .18, .95, pan)
+    setTimeout(() => pan.disconnect(), 1800)
+    creakIndex++
+    nextCreak = now + 6.7 + creakIndex % 3 * 1.9
+  }
+  if (uneasyRoom && now >= nextPulse) {
+    const distance = Math.hypot(game.player.x - game.pursuer.x, game.player.z - game.pursuer.z)
+    const threat = phase === 'returnNightmare' ? 1 : game.entityInside() ? Math.max(0, 1 - distance / 6) : 0
+    if (threat > 0) {
+      tone('sine', 59, 39, .035 + threat * .065, now, .15, master)
+      tone('sine', 52, 36, .025 + threat * .04, now + .21, .17, master)
+    }
+    nextPulse = now + 1.25 - threat * .5
+  }
   if (raining !== lastRaining) {
     rain.gain.setTargetAtTime(raining ? .14 : 0, now, .25)
     lastRaining = raining
@@ -168,11 +198,15 @@ export function updateSceneAudio(game) {
     }
   }
 
-  if (phase === 'fireEscape') {
+  if (phase === 'fireEscape' || phase === 'blackout' || phase === 'streetRun') {
     if (previousStep) distanceSinceStep += Math.hypot(game.player.x - previousStep.x, game.player.z - previousStep.z)
     previousStep = { ...game.player }
     if (distanceSinceStep >= .52) {
-      metalStep(now)
+      if (phase === 'fireEscape') metalStep(now)
+      else if (!game.hidden) {
+        tone('sine', phase === 'blackout' ? 118 : 92, 48, .043, now, .095, master)
+        tone('triangle', 260, 130, .012, now + .006, .055, master)
+      }
       distanceSinceStep %= .52
     }
   }
