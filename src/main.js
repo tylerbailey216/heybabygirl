@@ -2,6 +2,7 @@ import './style.css'
 import { createGame, descentDuration, descentFadeAt, encounterLimit, entityTypes, phoneRushDuration, returnDuration, returnFadeAt, returnReachAt, sipDuration, streetLightFade, streetWakeSeconds, wakeGoal } from './game.js'
 import { dateDialogue, streetDialogue } from './dialogue.js'
 import { nightmareBeat } from './nightmare.js'
+import { phonePhases } from './phone.js'
 import { newSetup } from './game.js'
 import { loadProgress, saveProgress, recordEscape, scoreRun, formatTime } from './arcade.js'
 import { createView } from './view.js'
@@ -36,6 +37,19 @@ const restartButton = document.querySelector('#restart')
 const soundToggle = document.querySelector('#sound-toggle')
 const startPanel = document.querySelector('#start-demo')
 const startButton = document.querySelector('#begin')
+const phoneHud = document.querySelector('#phone-hud')
+const phoneToggle = document.querySelector('#phone-toggle')
+function presentPhone() {
+  phoneHud.hidden = !started || !phonePhases.has(game.phase)
+  phoneToggle.textContent = `Phone light: ${game.phoneOn ? 'On' : 'Off'}`
+  phoneToggle.setAttribute('aria-pressed', String(game.phoneOn))
+  document.querySelector('#phone-warning').hidden = game.phoneOn
+}
+function togglePhone() {
+  if (!started || !phonePhases.has(game.phase)) return
+  game.phoneOn = !game.phoneOn
+  presentPhone()
+}
 const arcadeStart = document.querySelector('#arcade-start')
 const newRun = document.querySelector('#new-run')
 const storyReturn = document.querySelector('#story-return')
@@ -104,6 +118,7 @@ try {
 }
 
 function present() {
+  presentPhone()
   const { phase } = game
   const waking = phase === 'waking' || phase === 'streetDazed'
   const playing = waking || phase === 'blackout' || phase === 'fireEscape' || phase === 'phoneDark' || phase === 'streetRun'
@@ -337,6 +352,7 @@ if (view) {
   endingImage.src = splashArt
   present()
   startButton.addEventListener('click', startDemo)
+  phoneToggle.addEventListener('click', togglePhone)
   arcadeStart.addEventListener('click', () => startArcade())
   newRun.addEventListener('click', () => startArcade())
   storyReturn.addEventListener('click', () => {
@@ -367,6 +383,7 @@ if (view) {
   window.addEventListener('keydown', event => {
     if (event.ctrlKey || event.metaKey || event.altKey) return
     const key = event.key.length === 1 ? event.key.toLowerCase() : event.key
+    if (key === 'f') { if (!event.repeat) togglePhone(); return }
     if (!started) {
       if (key === 'Enter' || key === 'e' || key === ' ') {
         event.preventDefault()

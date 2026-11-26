@@ -1,12 +1,14 @@
 import * as T from 'three'
 import atlasUrl from './assets/heroine.webp'
+import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js'
+import { phonePhases } from './phone.js'
 
 const columns = 4
 const rows = 3
 const walkFrames = [1, 2, 3, 2]
 const frameRate = 9
 
-export function createHeroine(scene, fallback) {
+export function createHeroine(scene, fallback, camera) {
   // Keep the screen-facing art intact when it overlaps furniture in projection.
   const material = new T.SpriteMaterial({ alphaTest: .08, depthTest: false, depthWrite: false })
   const sprite = new T.Sprite(material)
@@ -16,6 +18,23 @@ export function createHeroine(scene, fallback) {
   sprite.scale.set(height * 200 / 360, height, 1)
   sprite.visible = false
   scene.add(sprite)
+  // A separate held prop preserves the heroine's authored atlas and silhouette.
+  const phoneArm = new T.Group()
+  scene.add(phoneArm)
+  function held(geometry, color, x, y, z) {
+    const mesh = new T.Mesh(geometry, new T.MeshBasicMaterial({ color, transparent: true, depthTest: false, depthWrite: false }))
+    mesh.position.set(x, y, z)
+    mesh.renderOrder = 12
+    phoneArm.add(mesh)
+    return mesh
+  }
+  held(new T.CapsuleGeometry(.075, .16, 4, 8), '#bb758c', .23, .04, .01).rotation.z = -.65
+  held(new T.CapsuleGeometry(.052, .22, 4, 8), '#805038', .34, .14, .02).rotation.z = -.9
+  held(new T.SphereGeometry(.07, 12, 8), '#8d5a3d', .45, .23, .04)
+  const phoneCase = held(new RoundedBoxGeometry(.225, .35, .055, 2, .035), '#171624', .48, .35, .025)
+  phoneCase.rotation.z = -.15
+  const screen = held(new RoundedBoxGeometry(.181, .277, .012, 2, .02), '#a9d7f1', .48, .35, .06)
+  screen.rotation.z = -.15
 
   let ready = false
   const atlas = new T.TextureLoader().load(atlasUrl, () => {
@@ -63,6 +82,11 @@ export function createHeroine(scene, fallback) {
     atlas.repeat.set((mirrored ? -1 : 1) / columns, 1 / rows)
     atlas.offset.set((frame + Number(mirrored)) / columns, (rows - 1 - row) / rows)
     sprite.position.set(player.x, ground + .02, player.z)
+    phoneArm.visible = phonePhases.has(phase) && !game.hidden
+    phoneArm.position.set(player.x, ground + 1.4, player.z)
+    if (camera) phoneArm.quaternion.copy(camera.quaternion)
+    phoneArm.scale.x = game.facing?.x < -.15 ? -1 : 1
+    screen.material.color.set(game.phoneOn ? '#b1e4ff' : '#272334')
     const visible = !game.hidden && phase !== 'descent' && phase !== 'phoneRush'
     sprite.visible = ready && visible
     fallback.visible = !ready && visible

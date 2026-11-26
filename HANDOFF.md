@@ -12,7 +12,30 @@ Move the apartment, fire escape, and street toward psychological horror through
 believable materials, deliberate light, environmental storytelling, and restrained
 sound. Preserve readable navigation and the existing keyboard/touch controls.
 
-## Return-to-apartment nightmare pass
+## Street polish and held phone
+
+The heroine keeps her existing atlas, with a camera-facing civilian sleeve/forearm,
+hand and rounded phone prop aligned to her wrist. The blue point spill and soft
+spotlight originate at the phone and follow her facing direction. Phone light is
+available in blackout, fireEscape and controllable street states, with HUD and F
+toggles. Off is allowed without blocking play; a contextual warning discourages
+losing sight of the route. Fresh runs restore On. The scripted dazed fade dims
+an enabled phone to 22% rather than overriding the player's switch entirely.
+
+Street kit: `art/street/street-kit.blend`, `src/assets/models/street-kit.glb`,
+`tools/build_street.py`. Seven material batches combine beveled architecture,
+shutters/awnings, lit sash windows, masonry, drainpipes and refined bin/mailbox
+props within the existing collision footprints. Runtime dressing adds textured
+wet asphalt, instanced rounded paving/curbs, irregular puddles and drains. The
+intersection has a curved lamp and warm reflections. Street cameras now show the
+facades and the heroine's phone more clearly.
+
+Validation: eleven simulation checks, production build and browser street test
+covering touch toggle, keyboard toggle, mobile HUD sizing, light-off movement,
+and reaching the safe intersection. Captures: `test-results/street-*.png` and
+`intersection-safe.png`. Physical iPhone performance/feel still needs a playtest.
+
+## Return nightmare details
 
 The Story return trap now reaches the heroine at 1.85 seconds (previously 3.35),
 with three stop-and-lunge advances, lateral displacement, and per-run variation.

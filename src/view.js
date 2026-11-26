@@ -1,5 +1,8 @@
 import * as T from 'three'
 import { nightmareBeat } from './nightmare.js'
+import { phoneBrightness } from './phone.js'
+import { dressStreet } from './street.js'
+import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js'
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
 import lampUrl from './assets/models/floor-lamp.glb?url'
 import { descentDelays, entityTypes, guestDepartureTimes, partyDuration, phoneRushDuration, returnReachAt, spots, streetIntersection, streetLightFade, streetProps } from './game.js'
@@ -343,7 +346,7 @@ export function createView(container) {
     return { group, legs, arms }
   }
   const player = character('heroine')
-  const poseHeroine = createHeroine(scene, player.group)
+  const poseHeroine = createHeroine(scene, player.group, camera)
   const heroineShadow = contact(room, 0, 0, 1.05, .65, .75)
   const date = character('date')
   // Party-only proportions: the heroine and shadow builders stay independent.
@@ -483,43 +486,33 @@ export function createView(container) {
   const phoneStreet = new T.Group()
   phoneStreet.visible = false
   scene.add(phoneStreet)
-  box(phoneStreet, '#23283a', 2.8, -.13, .15, 14, .25, 13.2, false)
-  box(phoneStreet, '#303748', 6.1, .018, -1.85, 4.15, .095, .35)
+  const streetRoad = box(phoneStreet, '#23283a', 4.5, -.13, .15, 19, .25, 13.2, false)
+  streetRoad.material = dressStreet(phoneStreet)
   for (let i = 0; i < 6; i++) {
     box(phoneStreet, '#9a9da9', streetIntersection.x, .006, -1.28 + i * .57, 1.65, .016, .23, false)
   }
   const streetLamp = new T.Group()
   phoneStreet.add(streetLamp)
   streetLamp.position.set(streetIntersection.x, 0, -1.96)
-  box(streetLamp, '#535e71', 0, 1.47, 0, .11, 2.94, .11)
-  box(streetLamp, '#525b6e', 0, 2.88, .42, .13, .1, .83)
-  const lampLens = box(streetLamp, '#f6d8a8', 0, 2.78, .86, .46, .08, .32)
+  shape(streetLamp, new T.CylinderGeometry(.045, .075, 3.1, 16), '#535e71', 0, 1.55, 0, false)
+  shape(streetLamp, new T.CylinderGeometry(.14, .18, .18, 16), '#353d50', 0, .09, 0, false)
+  const neck = new T.CatmullRomCurve3([new T.Vector3(0, 2.8, 0), new T.Vector3(0, 3.13, .18), new T.Vector3(0, 3.16, .7), new T.Vector3(0, 3.02, .9)])
+  shape(streetLamp, new T.TubeGeometry(neck, 16, .045, 8, false), '#525b6e', 0, 0, 0, false)
+  shape(streetLamp, new RoundedBoxGeometry(.5, .14, .38, 2, .06), '#353b4c', 0, 2.98, .9, false)
+  const lampLens = shape(streetLamp, new RoundedBoxGeometry(.42, .035, .31, 2, .025), '#f6d8a8', 0, 2.9, .9, false)
   lampLens.material = new T.MeshBasicMaterial({ color: '#fff0c7' })
-  const intersectionLight = new T.PointLight('#ffe0b1', 52, 8, 2)
+  const intersectionLight = new T.PointLight('#ffc585', 26, 8, 2)
   intersectionLight.position.set(0, 2.68, .84)
   streetLamp.add(intersectionLight)
-  box(phoneStreet, '#323747', 0, .025, -1.85, 8.2, .09, .35)
-  box(phoneStreet, '#1a1d2c', 0, .09, -4.45, 8.2, .22, 5, false)
-  for (let i = 0; i < 12; i++) {
-    box(phoneStreet, '#414657', -3.8 + i * .69, .078, -2.03, .66, .06, .19, false)
-    box(phoneStreet, '#303649', -3.8 + i * .69, 1.25, -6.25, .65, 2.65, .2, false)
-  }
-  for (const [index, prop] of streetProps.entries()) {
-    if (index === 0) {
-      shape(phoneStreet, new T.CylinderGeometry(.31, .265, .78, 12), '#454b5b', prop.x, .39, prop.z)
-      shape(phoneStreet, new T.CylinderGeometry(.365, .35, .085, 12), '#596072', prop.x, .81, prop.z)
-    } else {
-      box(phoneStreet, '#4a4853', prop.x, .27, prop.z, prop.w, .54, prop.d)
-      box(phoneStreet, '#5a596a', prop.x, .57, prop.z, prop.w + .045, .065, prop.d + .045)
-    }
-  }
   const phoneLight = new T.PointLight('#88b9ff', 7.8, 2.65, 2)
-  phoneStreet.add(phoneLight)
+  scene.add(phoneLight)
+  const phoneBeam = new T.SpotLight('#b6dcff', 15, 7, .5, .85, 1.5)
+  scene.add(phoneBeam, phoneBeam.target)
   const phonePool = new T.Mesh(new T.PlaneGeometry(3.8, 3.2), new T.MeshBasicMaterial({
     color: '#355f9b', map: shadowMap, transparent: true, opacity: .42, depthWrite: false,
   }))
   phonePool.rotation.x = -Math.PI / 2
-  phoneStreet.add(phonePool)
+  scene.add(phonePool)
   const rushLight = new T.PointLight('#446aa9', 18, 9, 2)
   rushLight.position.set(-2, 2.3, -2.8)
   phoneStreet.add(rushLight)
@@ -647,14 +640,14 @@ export function createView(container) {
     } else if (streetChase) {
       const { x, z } = game.player
       const lead = Math.min(x + 1.65, streetIntersection.x - .25)
-      camera.position.set(lead, 10.8, z + 6.7)
-      camera.lookAt(lead, .27, z)
+      camera.position.set(lead, 7.4, z + 8.5)
+      camera.lookAt(lead, .9, z - 1.4)
       camera.zoom = 1.23
     } else if (phoneDark || streetDazed) {
       const { x, z } = game.player
-      camera.position.set(x, 10.5, z + 6.5)
-      camera.lookAt(x, .35, z)
-      camera.zoom = 1.44
+      camera.position.set(x, 7.5, z + 8.5)
+      camera.lookAt(x, 1, z - 1.4)
+      camera.zoom = 1.25
     } else if (phoneRush) {
       camera.position.set(0, 2.15, 5.65)
       camera.lookAt(0, .63, -1.2)
@@ -681,19 +674,26 @@ export function createView(container) {
     phoneStreet.visible = trap
     outsideRain.visible = outside || trap
     outsideRain.material.opacity = phoneDark || streetDazed ? .14 : phoneRush ? .32 : .48
-    const phoneBrightness = phoneDark ? 1 : streetDazed ? Math.max(0, 1 - game.phoneElapsed / streetLightFade) : 0
-    phoneLight.visible = phoneBrightness > 0
+    const phoneStrength = phoneBrightness(game)
+    phoneLight.visible = phoneStrength > 0 && !game.hidden
     phonePool.visible = phoneLight.visible
-    phoneLight.intensity = 7.8 * phoneBrightness
-    phonePool.material.opacity = .42 * phoneBrightness
+    phoneBeam.visible = phoneLight.visible
+    phoneLight.intensity = 7.8 * phoneStrength
+    phoneBeam.intensity = 15 * phoneStrength
+    phonePool.material.opacity = .3 * phoneStrength
     rushLight.visible = phoneRush
-    streetLamp.visible = streetChase
+    streetLamp.visible = trap
     if (phoneLight.visible) {
-      phoneLight.position.set(game.player.x, 1.03, game.player.z - .22)
-      phonePool.position.set(game.player.x, .008, game.player.z)
+      const phoneGround = outside ? floorHeight(game.player.x) : 0
+      const side = game.facing.x < -.15 ? -1 : 1
+      phoneLight.position.set(.48 * side, .35, .06).applyQuaternion(camera.quaternion)
+      phoneLight.position.add(new T.Vector3(game.player.x, phoneGround + 1.4, game.player.z))
+      phoneBeam.position.copy(phoneLight.position)
+      phoneBeam.target.position.set(game.player.x + game.facing.x * 2.7, phoneGround + .03, game.player.z + game.facing.z * 2.7)
+      phonePool.position.set(game.player.x + game.facing.x * .8, phoneGround + .065, game.player.z + game.facing.z * .8)
     }
     ceiling.intensity = blackout ? .04 : 2.1 - night * 1.15
-    ambient.intensity = streetChase ? .075 : trap ? .022 : blackout ? .31 : 1.21 - night * .38
+    ambient.intensity = streetChase ? .38 : trap ? .25 : blackout ? .31 : 1.21 - night * .38
     moon.intensity = trap ? 0 : blackout ? 26 : 12 + night * 9
     partyLight.intensity = partyScene ? (1 - night * .78) * (18 + Math.sin(time * 4.4) * 4) : 0
     dreamLight.intensity = dreaming ? 8 + Math.sin(time * 2.8) * 1.45 : 0

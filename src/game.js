@@ -66,6 +66,7 @@ export function createGame(setbacks = {}, options = {}) {
     hidden: false, dragging: false, barricade: false, latch: 0,
     hasPin: false, examinedLatch: false, heardVoice: false, cinematicElapsed: 0, phoneElapsed: 0, streetChaseFailed: false,
     arcade, setup, pinSpot, runTime: 0, closeEncounters: 0, searchRemaining: 0, musicDucked: false, nightmareSeed: Math.random() * Math.PI * 2,
+    phoneOn: true, facing: { x: 1, z: 0 },
   }
   const entityIndex = () => arcade ? Math.floor(setup / 3) : Math.min(game.encounters, entityTypes.length - 1)
   const currentEntity = () => entityTypes[entityIndex()]
@@ -248,6 +249,10 @@ export function createGame(setbacks = {}, options = {}) {
       return
     }
     const length = Math.hypot(inputX, inputZ)
+    if (length > .15 && ['blackout', 'fireEscape', 'phoneDark', 'streetRun'].includes(game.phase)) {
+      game.facing.x = inputX / length
+      game.facing.z = inputZ / length
+    }
     const normalizer = Math.max(1, length)
     if (game.phase === 'phoneDark') {
       game.phoneElapsed += dt

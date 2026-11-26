@@ -60,6 +60,16 @@ Tap a dialogue response or press **1** or **2**. Each prompt has one response th
 | Move | WASD or arrow keys | Drag the thumbstick in any direction |
 | Interact | E | Tap the active Table, Hide, Inspect, or Latch button |
 | Restart | R | Tap Restart |
+| Toggle phone flashlight | F | Tap Phone light |
+
+The heroine visibly holds her phone while exploring the blackout, fire escape,
+and controllable street scenes. Its blue spill and directional beam follow her
+movement. Turning it off is allowed and leaves movement/interactions available;
+the HUD warns that darkness hides the route. Each fresh run starts with it on.
+Street dressing includes the editable Blender kit at `art/street/street-kit.blend`,
+with beveled civilian street props, shuttered storefronts, masonry and lit windows.
+Wet asphalt, puddles, drains, paving and warm intersection lighting complete the
+nighttime palette. Regenerate the kit using Blender and `tools/build_street.py`.
 
 After the drink sequence, shake the thumbstick left and right or alternate A and D to fill the wake meter. Once the heroine can move, get the release pin and head for the balcony. A barricade can still delay an entry while the door is closed. Interact near the hanging coats to hide or emerge. Find the balcony release pin in the sideboard. Use the pin at the balcony and stay still until the latch opens. Cross the fire escape, step onto the street, and choose whether to check the phone. The ending cutscene leads to a restart screen. If the phone trap catches you, retry the street, shake awake within seven seconds after the light goes out, then run right to the lit intersection. If caught, **Retry blackout** starts a fresh escape attempt. After escaping, **Play again** returns to the date.
 

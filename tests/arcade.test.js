@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 import { createGame, newSetup, pinLocations, spots } from '../src/game.js'
 import { loadProgress, saveProgress, recordEscape, scoreRun } from '../src/arcade.js'
 import { nightmareBeat } from '../src/nightmare.js'
+import { phoneBrightness } from '../src/phone.js'
 
 function awake(game) {
   game.beginWake()
@@ -186,4 +187,22 @@ test('reduced motion removes camera movement and lighting/blur pulses', () => {
     assert.equal(shot.darkness, shots[0].darkness)
     assert.equal(shot.blur, shots[0].blur)
   }
+})
+
+test('phone can be switched off without blocking movement; reset restores its light', () => {
+  const game = createGame()
+  game.phase = 'streetRun'
+  assert.equal(phoneBrightness(game), 1)
+  game.phoneOn = false
+  game.pursuer.x = -100
+  const x = game.player.x
+  game.update(.2, 1, 0)
+  assert.ok(game.player.x > x)
+  assert.equal(phoneBrightness(game), 0)
+  assert.equal(game.facing.x, 1)
+  game.phoneOn = true
+  game.phase = 'streetDazed'
+  game.phoneElapsed = 5
+  assert.equal(phoneBrightness(game), .22)
+  assert.equal(createGame().phoneOn, true)
 })

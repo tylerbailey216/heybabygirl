@@ -382,6 +382,12 @@ kbd{border:1px solid #bd8f8170;border-radius:4px;padding:.1rem .3rem;margin-left
 @media(prefers-reduced-motion:reduce){#breach-art{animation:none}}
 
 .header-actions{display:flex;align-items:center;gap:.38rem}
+#phone-hud{position:absolute;right:max(16px,env(safe-area-inset-right));bottom:max(155px,calc(env(safe-area-inset-bottom) + 150px));z-index:3;text-align:right;max-width:220px}
+#phone-hud[hidden],#phone-warning[hidden]{display:none}
+#phone-toggle{min-height:46px;background:#142533ed;border-color:#7cabbf;color:#d8edff}
+#phone-toggle[aria-pressed="false"]{background:#2d1724;border-color:#a87286;color:#f4c5cf}
+#phone-warning{margin-top:6px;padding:7px;background:#100a16ed;color:#efc3cb;font-size:.75rem;line-height:1.35}
+@media(max-height:480px){#phone-hud{bottom:105px;max-width:220px}#phone-warning{font-size:.65rem}}
 .header-actions button{min-height:44px;padding:.5rem .64rem}
 #sound-toggle{font-size:.84rem;border-color:#a7777e7d}
 #start-demo{
