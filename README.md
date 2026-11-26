@@ -20,6 +20,8 @@ npm run preview
 
 ## Controls
 
+Select **Start demo** to begin the party and enable sound in your browser. Use the **Mute** button or **M** to toggle sound.
+
 Tap a dialogue response or press **1** or **2**. Each prompt has one response that advances the story. A wrong answer in the apartment changes the current run, even if you retry the blackout. A wrong answer at street level sends you back to that street prompt.
 
 | Action | Keyboard | Touch |

@@ -3,7 +3,7 @@ import { createGame, descentDuration, descentFadeAt, encounterLimit, entityTypes
 import { dateDialogue, streetDialogue } from './dialogue.js'
 import { createView } from './view.js'
 import { bindThumbstick } from './thumbstick.js'
-import { enableEntityAudio, playEntitySound } from './entity-audio.js'
+import { enableEntityAudio, playEntitySound, setAudioMuted, updateSceneAudio } from './entity-audio.js'
 import heroinePortrait from './assets/heroine-portrait.webp'
 import datePortrait from './assets/date-portrait.webp'
 import tallPortrait from './assets/shadow-tall.webp'
@@ -30,6 +30,9 @@ const endingImage = document.querySelector('#ending-art')
 const endingRestart = document.querySelector('#ending-restart')
 const cinematicFade = document.querySelector('#cinematic-fade')
 const restartButton = document.querySelector('#restart')
+const soundToggle = document.querySelector('#sound-toggle')
+const startPanel = document.querySelector('#start-demo')
+const startButton = document.querySelector('#begin')
 const wakePanel = document.querySelector('#wake-panel')
 const wakeInstructions = document.querySelector('#wake-instructions')
 const wakeTimer = document.querySelector('#wake-timer')
@@ -64,6 +67,8 @@ const statusLine = document.querySelector('#status-line')
 const hasTouch = matchMedia('(any-pointer: coarse)')
 const portraits = { date: datePortrait, heroine: heroinePortrait }
 const appliedSetbacks = new Set()
+let started = false
+let muted = false
 let game = createGame()
 let beat = 0
 let dateSetback
@@ -87,6 +92,9 @@ function present() {
   const playing = waking || phase === 'blackout' || phase === 'fireEscape' || phase === 'phoneDark' || phase === 'streetRun'
   const speaking = phase === 'date' || phase === 'caught' || phase === 'phoneCaught' || phase === 'streetSafe' || phase === 'returnCaught'
   gameScreen.dataset.phase = phase
+  startPanel.hidden = started
+  restartButton.hidden = !started
+  soundToggle.hidden = !started
   dialogueLayer.hidden = !speaking
   breachSplash.hidden = phase !== 'breachIntro'
   streetEnding.hidden = phase !== 'street'
@@ -234,12 +242,30 @@ function next() {
   }
 }
 
+function startDemo() {
+  if (started) return
+  enableEntityAudio()
+  started = true
+  present()
+}
+
+function toggleSound() {
+  muted = !muted
+  if (!muted) enableEntityAudio()
+  setAudioMuted(muted)
+  soundToggle.textContent = muted ? 'Unmute' : 'Mute'
+  soundToggle.setAttribute('aria-pressed', String(muted))
+  soundToggle.setAttribute('aria-label', muted ? 'Unmute sound' : 'Mute sound')
+}
+
 const movement = new Set(['w', 'a', 's', 'd', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'])
 if (view) {
   breachImage.src = breachArt
   streetImage.src = streetArt
   endingImage.src = splashArt
   present()
+  startButton.addEventListener('click', startDemo)
+  soundToggle.addEventListener('click', toggleSound)
   advance.addEventListener('click', next)
   breachContinue.addEventListener('click', next)
   for (const buttons of [dateButtons, streetButtons]) {
@@ -262,6 +288,17 @@ if (view) {
   window.addEventListener('keydown', event => {
     if (event.ctrlKey || event.metaKey || event.altKey) return
     const key = event.key.length === 1 ? event.key.toLowerCase() : event.key
+    if (!started) {
+      if (key === 'Enter' || key === 'e' || key === ' ') {
+        event.preventDefault()
+        if (!event.repeat) startDemo()
+      }
+      return
+    }
+    if (key === 'm') {
+      if (!event.repeat) toggleSound()
+      return
+    }
     if (game.phase === 'returnNightmare') {
       if (movement.has(key) || ['e', 'r', 'Enter', ' '].includes(key)) event.preventDefault()
       return
@@ -298,7 +335,10 @@ if (view) {
     const keyboardX = Number(pressed('d', 'ArrowRight')) - Number(pressed('a', 'ArrowLeft'))
     const keyboardZ = Number(pressed('s', 'ArrowDown')) - Number(pressed('w', 'ArrowUp'))
     const usingKeyboard = keyboardX !== 0 || keyboardZ !== 0
-    game.update(dt, usingKeyboard ? keyboardX : stick.x, usingKeyboard ? keyboardZ : stick.z)
+    if (started) {
+      game.update(dt, usingKeyboard ? keyboardX : stick.x, usingKeyboard ? keyboardZ : stick.z)
+      updateSceneAudio(game)
+    }
     if (displayedPhase !== game.phase) {
       displayedPhase = game.phase
       present()
@@ -306,7 +346,8 @@ if (view) {
       else if (game.phase === 'breachIntro') {
         breachContinue.focus()
         shownEntity = game.encounters
-        playEntitySound(entityTypes[shownEntity].voice)
+        playEntitySound('Door')
+        playEntitySound(entityTypes[shownEntity].voice, .42)
       } else if (game.phase === 'street') streetButtons[0].focus()
       else if (game.phase === 'complete') endingRestart.focus()
       if (game.phase === 'phoneRush' || game.phase === 'streetRun') playEntitySound('Hiss')
@@ -333,7 +374,7 @@ if (view) {
     const prompt = game.action()
     const arrivalAt = game.entityArrivalAt()
     const entityInside = (playing || waking) && game.entityInside()
-    if (entityInside && !wasInside) playEntitySound('Door')
+    if (entityInside && !wasInside && game.encounters > 0) playEntitySound('Door')
     wasInside = entityInside
     if (playing && entityInside && game.elapsed >= arrivalAt + entityEntranceBeat && shownEntity !== game.encounters) {
       shownEntity = game.encounters

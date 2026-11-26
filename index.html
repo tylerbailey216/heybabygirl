@@ -10,7 +10,14 @@
 <main id="game" aria-label="Hey Baby Girl">
   <div id="scene" aria-hidden="true"></div>
   <div id="darkness" aria-hidden="true"></div>
-  <header><div><p class="eyebrow">BLACKOUT DATE</p><h1>Hey Baby Girl<span>.</span></h1></div><button id="restart" type="button" aria-label="Restart game">Restart</button></header>
+  <header>
+    <div><p class="eyebrow">BLACKOUT DATE</p><h1>Hey Baby Girl<span>.</span></h1></div>
+    <div class="header-actions">
+      <button id="sound-toggle" type="button" aria-label="Mute sound" aria-pressed="false" hidden>Mute</button>
+      <button id="restart" type="button" aria-label="Restart game" hidden>Restart</button>
+    </div>
+  </header>
+  <div id="start-demo" hidden><button id="begin" type="button">Start demo</button></div>
   <div id="status" aria-live="polite" hidden>
     <span id="entity-cue" hidden><img id="entity-portrait" alt=""></span>
     <span id="status-line"></span>
