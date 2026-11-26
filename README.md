@@ -76,7 +76,7 @@ overworld theme remains outside. The party NPCs use a separate civilian characte
 builder inspired by the supplied FedUP references. Heroine and shadow art remain
 separate and unchanged.
 
-The production build passes. The game simulation was exercised for the barricade delay, hiding through entry, successful escape, capture, and a fresh escape after state reset. Browser rendering and physical iPhone input still need a smoke test.
+The production build and simulation/storage checks pass. Earlier simulation coverage includes barricade delay, hiding through entry, escape, capture, and state reset. Headless Edge checks cover desktop rendering, apartment track playback, and portrait/landscape arcade results and retries. Physical iPhone input and subjective sound balance still need playtesting.
 
 ## GitHub Pages
 
