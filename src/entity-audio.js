@@ -4,11 +4,15 @@ let context
 let master
 let music
 let musicFilter
+let overworldMusic
+let overworldFilter
 let crowd
 let rain
 let muted = false
 let nextBeat = 0
 let beat = 0
+let nextOverworldBeat = 0
+let overworldBeat = 0
 let lastPhase
 let lastGame
 let lastRoomSound = -1
@@ -20,6 +24,12 @@ const rainyPhases = new Set(['fireEscape', 'street', 'streetDazed', 'streetRun',
 const beatInterval = .29
 const bassNotes = [46, 46, 53, 46, 43, 43, 50, 43]
 const chordNotes = [[62, 65, 69], [58, 62, 65], [60, 64, 67], [57, 60, 64]]
+const overworldBeatInterval = .326
+// D Phrygian / diminished colours: a melody that feels familiar, but never resolves.
+const overworldBass = [38, null, 38, 41, 37, null, 37, 34, 38, null, 38, 44, 37, null, 36, 34]
+const overworldLead = [62, null, 65, 61, 62, null, 68, 65, 62, 61, 58, null, 60, 61, 58, 56, 62, null, 65, 61, 62, 68, 70, null, 68, 65, 62, 61, 58, 60, 56, null]
+const overworldChords = [[50, 53, 56], [49, 53, 56], [46, 49, 53], [44, 49, 53]]
+const overworldPhases = new Set(['waking', 'blackout', 'fireEscape', 'street', 'phoneDark', 'streetDazed', 'streetRun', 'streetSafe', 'phoneRush'])
 
 function makeNoise(seconds, pattern = () => 1, voice = () => 0) {
   const length = Math.ceil(context.sampleRate * seconds)
@@ -65,6 +75,13 @@ export function enableEntityAudio() {
     musicFilter = context.createBiquadFilter()
     musicFilter.type = 'lowpass'
     music.connect(musicFilter).connect(master)
+    overworldMusic = context.createGain()
+    overworldMusic.gain.value = 0
+    overworldFilter = context.createBiquadFilter()
+    overworldFilter.type = 'lowpass'
+    overworldFilter.frequency.value = 1400
+    overworldFilter.Q.value = .7
+    overworldMusic.connect(overworldFilter).connect(master)
     crowd = bed(makeNoise(3.9, t => {
       const near = .5 + .5 * Math.sin(t * 13 + Math.sin(t * 4) * 2)
       const far = .5 + .5 * Math.sin(t * 8 + Math.sin(t * 2.1))
@@ -122,6 +139,58 @@ function playPartyBeat(now) {
   beat++
 }
 
+function chipNoise(now, level, output) {
+  const duration = .055
+  const source = context.createBufferSource()
+  source.buffer = makeNoise(duration, t => 1 - t / duration)
+  const filter = context.createBiquadFilter()
+  filter.type = 'highpass'
+  filter.frequency.value = 2900
+  const volume = context.createGain()
+  volume.gain.setValueAtTime(level, now)
+  volume.gain.exponentialRampToValueAtTime(.001, now + duration)
+  source.connect(filter).connect(volume).connect(output)
+  source.start(now)
+  source.onended = () => {
+    source.disconnect()
+    filter.disconnect()
+    volume.disconnect()
+  }
+}
+
+function playOverworldBeat(now, energy) {
+  const slot = overworldBeat % 32
+  const bass = overworldBass[slot % overworldBass.length]
+  const lead = overworldLead[slot]
+  if (bass !== null) {
+    const frequency = pitch(bass)
+    // A Commodore-like pulse bass with a restrained triangle sub underneath.
+    tone('square', frequency, frequency, .075 + energy * .055, now, .22, overworldMusic)
+    if (slot % 4 === 0) tone('triangle', frequency / 2, frequency / 2, .11 + energy * .06, now, .27, overworldMusic)
+  }
+  if (slot % 8 === 0) {
+    for (const note of overworldChords[Math.floor(overworldBeat / 8) % overworldChords.length]) {
+      tone('sine', pitch(note), pitch(note), .018 + energy * .018, now, .72, overworldMusic)
+    }
+  }
+  if (lead !== null && (slot % 2 === 0 || energy > .84)) {
+    const frequency = pitch(lead)
+    // The detuned fifth hints at a damaged NES pulse channel rather than a clean lead.
+    tone('square', frequency, frequency, .04 + energy * .035, now, .13, overworldMusic)
+    if (slot % 4 === 0) tone('triangle', frequency * 1.498, frequency * 1.498, .021 + energy * .018, now + .012, .18, overworldMusic)
+  }
+  if (slot % 4 === 2 || (energy > .84 && slot % 2)) chipNoise(now, .016 + energy * .018, overworldMusic)
+  overworldBeat++
+}
+
+function overworldEnergy(phase) {
+  if (phase === 'streetRun' || phase === 'phoneRush') return 1
+  if (phase === 'fireEscape') return .82
+  if (phase === 'street' || phase === 'streetSafe') return .72
+  if (phase === 'phoneDark' || phase === 'streetDazed') return .42
+  return .6
+}
+
 function metalStep(now) {
   tone('triangle', 161, 81, .08, now, .105, master)
   tone('sine', 1050, 520, .052, now + .008, .16, master)
@@ -166,6 +235,22 @@ export function updateSceneAudio(game) {
       playPartyBeat(Math.max(now, nextBeat))
       nextBeat += beatInterval
     }
+  }
+
+  const overworldActive = overworldPhases.has(phase)
+  const energy = overworldEnergy(phase)
+  overworldMusic.gain.setTargetAtTime(overworldActive ? .29 : 0, now, overworldActive ? .22 : .12)
+  overworldFilter.frequency.setTargetAtTime(720 + energy * 1350, now, .24)
+  if (overworldActive) {
+    if (nextOverworldBeat < now - .1) nextOverworldBeat = now
+    while (nextOverworldBeat < now + .055) {
+      playOverworldBeat(Math.max(now, nextOverworldBeat), energy)
+      nextOverworldBeat += overworldBeatInterval
+    }
+  } else {
+    // A new nightmare run always begins on the first uneasy downbeat.
+    overworldBeat = 0
+    nextOverworldBeat = now
   }
 
   if (phase === 'fireEscape') {
