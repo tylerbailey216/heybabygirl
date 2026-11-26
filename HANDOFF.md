@@ -12,7 +12,21 @@ Move the apartment, fire escape, and street toward psychological horror through
 believable materials, deliberate light, environmental storytelling, and restrained
 sound. Preserve readable navigation and the existing keyboard/touch controls.
 
-## Dialogue and balcony audio pass
+## Return-to-apartment nightmare pass
+
+The Story return trap now reaches the heroine at 1.85 seconds (previously 3.35),
+with three stop-and-lunge advances, lateral displacement, and per-run variation.
+The entity stares outward while closing in. Contact drives a short camera jolt,
+roll, zoom and blur peak; fog, crimson practical lighting, and pulsing edge darkness
+make the room feel hostile before the final fade. Total shot duration is 3.5 seconds.
+Existing heroine and entity artwork is preserved.
+
+Reduced motion uses a smooth approach, fixed camera and steady lighting/blur.
+Camera orientation, fog, lighting, and CSS effects reset outside the shot.
+Ten simulation tests, the production build, and the nightmare browser capture/
+reduced-motion/reset check pass. Captures: ignored `test-results/nightmare-*.png`.
+
+## Dialogue and balcony audio details
 
 - Stay quiet and listen reduces the apartment music gain from .26 to .12;
   Crank the music back up restores it.

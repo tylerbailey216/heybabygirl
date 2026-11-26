@@ -2,6 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { createGame, newSetup, pinLocations, spots } from '../src/game.js'
 import { loadProgress, saveProgress, recordEscape, scoreRun } from '../src/arcade.js'
+import { nightmareBeat } from '../src/nightmare.js'
 
 function awake(game) {
   game.beginWake()
@@ -154,4 +155,35 @@ test('unlock, setup bests, and discovered shadows survive storage; denied storag
   assert.equal(scoreRun({ ...game, closeEncounters: 999 }), scoreRun({ ...game, closeEncounters: 3 }))
   assert.equal(saveProgress(undefined, progress), false)
   assert.equal(loadProgress(undefined).unlocked, false)
+})
+
+test('return nightmare lunges quickly, ends cleanly, and retries outside', () => {
+  const game = createGame()
+  game.phase = 'fireEscape'
+  game.player.x = -5.02
+  game.update(.05, -1, 0)
+  assert.equal(game.phase, 'returnNightmare')
+  assert.ok(nightmareBeat(.6).approach > .35)
+  assert.ok(nightmareBeat(1.2).approach > .64)
+  assert.equal(nightmareBeat(1.85).approach, 1)
+  const alternate = nightmareBeat(.42, 2)
+  assert.notEqual(alternate.side, nightmareBeat(.42, 0).side)
+  game.update(3.5, 0, 0)
+  assert.equal(game.phase, 'returnCaught')
+  game.retryFireEscape()
+  assert.equal(game.phase, 'fireEscape')
+  assert.equal(game.cinematicElapsed, 0)
+})
+
+test('reduced motion removes camera movement and lighting/blur pulses', () => {
+  const shots = [.2, .7, 1.2, 1.85].map(t => nightmareBeat(t, 3, true))
+  for (const shot of shots) {
+    assert.equal(shot.shakeX, 0)
+    assert.equal(shot.shakeY, 0)
+    assert.equal(shot.roll, 0)
+    assert.equal(shot.side, 0)
+    assert.equal(shot.light, shots[0].light)
+    assert.equal(shot.darkness, shots[0].darkness)
+    assert.equal(shot.blur, shots[0].blur)
+  }
 })

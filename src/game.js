@@ -6,9 +6,9 @@ export const entityTypes = [
 export const encounterLimit = entityTypes.length
 export const descentFadeAt = 7.7
 export const descentDuration = 9.3
-export const returnReachAt = 3.35
-export const returnFadeAt = 3.6
-export const returnDuration = 4.95
+export const returnReachAt = 1.85
+export const returnFadeAt = 2.2
+export const returnDuration = 3.5
 export const descentDelays = [0, 1.9, 2.8, 3.7]
 export const partyDuration = 11.8
 export const guestDepartureTimes = [4.7, 6.1, 7.5, 9.2]
@@ -65,7 +65,7 @@ export function createGame(setbacks = {}, options = {}) {
     pursuer: { ...spots.entry }, elapsed: 0, entryAt: Infinity, reappearsAt: 0, encounters: 0,
     hidden: false, dragging: false, barricade: false, latch: 0,
     hasPin: false, examinedLatch: false, heardVoice: false, cinematicElapsed: 0, phoneElapsed: 0, streetChaseFailed: false,
-    arcade, setup, pinSpot, runTime: 0, closeEncounters: 0, searchRemaining: 0, musicDucked: false,
+    arcade, setup, pinSpot, runTime: 0, closeEncounters: 0, searchRemaining: 0, musicDucked: false, nightmareSeed: Math.random() * Math.PI * 2,
   }
   const entityIndex = () => arcade ? Math.floor(setup / 3) : Math.min(game.encounters, entityTypes.length - 1)
   const currentEntity = () => entityTypes[entityIndex()]

@@ -1,4 +1,5 @@
 import * as T from 'three'
+import { nightmareBeat } from './nightmare.js'
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
 import lampUrl from './assets/models/floor-lamp.glb?url'
 import { descentDelays, entityTypes, guestDepartureTimes, partyDuration, phoneRushDuration, returnReachAt, spots, streetIntersection, streetLightFade, streetProps } from './game.js'
@@ -10,6 +11,7 @@ import fabricUrl from './assets/upholstery.webp'
 
 export function createView(container) {
   const scene = new T.Scene()
+  const nightmareFog = new T.FogExp2('#100711', .085)
   scene.background = new T.Color('#100d17')
   const camera = new T.OrthographicCamera()
   camera.position.set(0, 15, 9.5)
@@ -408,6 +410,9 @@ export function createView(container) {
   const dreamLight = new T.PointLight('#9470ff', 0, 5, 2)
   dreamLight.position.set(-4.55, 1.95, -2.28)
   room.add(dreamLight)
+  const returnLight = new T.PointLight('#d52b56', 0, 5, 2)
+  returnLight.position.set(3.1, 1.8, -2.2)
+  room.add(returnLight)
   const drink = shape(room, new T.CylinderGeometry(.074, .058, .19, 10), '#e3b385', .24, 1.05, 1.17, false)
   drink.material = new T.MeshBasicMaterial({ color: '#e1ac7c', depthTest: false, depthWrite: false, transparent: true })
   drink.renderOrder = 11
@@ -606,6 +611,8 @@ export function createView(container) {
     const sip = game.phase === 'sip'
     const waking = game.phase === 'waking'
     const returning = game.phase === 'returnNightmare'
+    const nightmare = nightmareBeat(game.cinematicElapsed, game.nightmareSeed, reducedMotion.matches)
+    scene.fog = returning ? nightmareFog : null
     setRoomInverted(returning)
     const partyScene = party || sip || game.phase === 'date'
     const blackout = !partyScene
@@ -631,10 +638,12 @@ export function createView(container) {
     const streetChase = streetRun || streetSafe
     const trap = phoneDark || phoneRush || streetDazed || streetChase
     const pan = cinematic && !reducedMotion.matches ? game.cinematicElapsed * .085 : 0
+    camera.up.set(0, 1, 0)
     if (returning) {
-      camera.position.set(3.05, 7.4, 5.3)
-      camera.lookAt(2.65, .65, -1.9)
-      camera.zoom = reducedMotion.matches ? 1.49 : 1.42 + Math.min(.22, game.cinematicElapsed * .05)
+      camera.up.set(Math.sin(nightmare.roll), Math.cos(nightmare.roll), 0)
+      camera.position.set(3.05 + nightmare.shakeX, 7.4 + nightmare.shakeY, 5.3)
+      camera.lookAt(2.65 + nightmare.shakeX * .4, .65, -1.9)
+      camera.zoom = reducedMotion.matches ? 1.49 : 1.42 + nightmare.approach * .17 + nightmare.impact * .11
     } else if (streetChase) {
       const { x, z } = game.player
       const lead = Math.min(x + 1.65, streetIntersection.x - .25)
@@ -688,6 +697,13 @@ export function createView(container) {
     moon.intensity = trap ? 0 : blackout ? 26 : 12 + night * 9
     partyLight.intensity = partyScene ? (1 - night * .78) * (18 + Math.sin(time * 4.4) * 4) : 0
     dreamLight.intensity = dreaming ? 8 + Math.sin(time * 2.8) * 1.45 : 0
+    returnLight.intensity = returning ? 5 + nightmare.light * 12 : 0
+    if (returning) {
+      ambient.intensity = .12 + nightmare.light * .13
+      moon.intensity = 7 + nightmare.light * 16
+      dreamLight.intensity = 5 + nightmare.light * 13
+      dreamLight.color.set('#bf3158')
+    } else dreamLight.color.set('#9470ff')
     partyFill.intensity = partyScene ? (1 - night * .7) * (14 + Math.sin(time * 3.2 + 1) * 3) : 0
     const candleLit = !returning && (party || !game.penalties.darkness)
     flame.visible = candleLit
@@ -732,16 +748,18 @@ export function createView(container) {
     let reach = 0
     if (returning) {
       const timeInShot = game.cinematicElapsed
-      const approach = T.MathUtils.smoothstep(timeInShot, .32, returnReachAt)
-      const lurch = reducedMotion.matches ? 0 : Math.sin(timeInShot * 7.4) * .085 * Math.sin(approach * Math.PI)
+      const approach = nightmare.approach
+      const lurch = nightmare.side
       const x = T.MathUtils.lerp(1.12, game.player.x - .27, approach) + lurch
       const z = T.MathUtils.lerp(-.55, game.player.z + .41, approach)
-      actorPose(pursuer, { x, z }, time * 1.16)
-      pursuer.group.rotation.y = Math.atan2(game.player.x - x, game.player.z - z)
-      reach = T.MathUtils.smoothstep(timeInShot, returnReachAt - 1.1, returnReachAt + .23)
-      pursuer.group.scale.set(1.17 + reach * .19, 1.35 + reach * .08, 1.2)
-      pursuer.group.rotation.x = -.09 - reach * .19
-      poseWisps(pursuer, time * 1.19)
+      actorPose(pursuer, { x, z }, time * 2.8)
+      // It keeps looking out of the scene while its body closes on her.
+      pursuer.group.rotation.y = T.MathUtils.lerp(.15, Math.atan2(game.player.x - x, game.player.z - z), Math.max(0, approach - .8) * 1.5)
+      reach = T.MathUtils.smoothstep(timeInShot, returnReachAt - .45, returnReachAt + .12)
+      pursuer.group.scale.set(1.17 + reach * .24, 1.35 + reach * .22, 1.2)
+      pursuer.group.rotation.x = -.09 - reach * .3
+      pursuer.group.rotation.z = reducedMotion.matches ? 0 : Math.sin(timeInShot * 23 + game.nightmareSeed) * .065
+      poseWisps(pursuer, time * 2.4)
     } else if (phoneRush) {
       const progress = Math.min(1, game.phoneElapsed / phoneRushDuration)
       const dash = progress ** 1.45
@@ -757,6 +775,7 @@ export function createView(container) {
       pursuer.group.rotation.y = 0
     }
     const entity = game.currentEntity()
+    if (!returning) pursuer.group.rotation.z = 0
     if (!phoneRush && !returning) {
       pursuer.group.scale.set(...(streetRun ? [1.12, .96, 1.2] : entity.scale))
       pursuer.group.rotation.x = streetRun ? -.17 : 0

@@ -312,7 +312,12 @@ kbd{border:1px solid #bd8f8170;border-radius:4px;padding:.1rem .3rem;margin-left
 }
 
 #game:is([data-phase="returnNightmare"],[data-phase="returnCaught"]) :is(header,footer){visibility:hidden}
-#game[data-phase="returnNightmare"] #scene canvas{filter:blur(1.45px) contrast(1.28) saturate(.72)}
+#game[data-phase="returnNightmare"] #scene canvas{filter:blur(var(--nightmare-blur,.8px)) contrast(1.48) saturate(.52)}
+#game[data-phase="returnNightmare"] #scene::after{content:'';position:absolute;inset:0;pointer-events:none;background:radial-gradient(ellipse at 59% 44%,transparent 12%,#160310aa 62%,#030107 95%);opacity:var(--nightmare-darkness,.4);box-shadow:inset 0 0 12vw #050109}
+@media(prefers-reduced-motion:reduce){
+  #game[data-phase="returnNightmare"] #scene canvas{filter:blur(.65px) contrast(1.35) saturate(.55)}
+  #game[data-phase="returnNightmare"] #darkness::before{animation:none}
+}
 #game[data-phase="returnCaught"] #scene{visibility:hidden}
 
 #game[data-phase="breachIntro"] :is(header,footer,#markers){visibility:hidden}

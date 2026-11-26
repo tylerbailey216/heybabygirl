@@ -1,6 +1,7 @@
 import './style.css'
 import { createGame, descentDuration, descentFadeAt, encounterLimit, entityTypes, phoneRushDuration, returnDuration, returnFadeAt, returnReachAt, sipDuration, streetLightFade, streetWakeSeconds, wakeGoal } from './game.js'
 import { dateDialogue, streetDialogue } from './dialogue.js'
+import { nightmareBeat } from './nightmare.js'
 import { newSetup } from './game.js'
 import { loadProgress, saveProgress, recordEscape, scoreRun, formatTime } from './arcade.js'
 import { createView } from './view.js'
@@ -80,6 +81,7 @@ const stick = bindThumbstick(document.querySelector('#thumbstick'))
 const status = document.querySelector('#status')
 const statusLine = document.querySelector('#status-line')
 const hasTouch = matchMedia('(any-pointer: coarse)')
+const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)')
 const portraits = { date: datePortrait, heroine: heroinePortrait }
 const appliedSetbacks = new Set()
 let started = false
@@ -471,7 +473,11 @@ if (view) {
       : phoneRush ? Math.max(0, (game.phoneElapsed - phoneRushDuration + .22) / .22)
         : Number(game.phase === 'complete')
     if (game.phase === 'returnNightmare') {
-      fade = Math.max(0, Math.min(1, (game.cinematicElapsed - returnFadeAt) / (returnDuration - returnFadeAt - .3)))
+      const nightmare = nightmareBeat(game.cinematicElapsed, game.nightmareSeed, reducedMotion.matches)
+      gameScreen.style.setProperty('--nightmare-blur', `${nightmare.blur}px`)
+      gameScreen.style.setProperty('--nightmare-darkness', nightmare.darkness)
+      const finalFade = Math.max(0, Math.min(1, (game.cinematicElapsed - returnFadeAt) / (returnDuration - returnFadeAt - .3)))
+      fade = Math.max(finalFade, nightmare.darkness * .42)
     } else if (game.phase === 'sip') {
       const t = game.introElapsed
       const pulse = Math.sin(Math.PI * (t - .65) / 1.14) ** 2

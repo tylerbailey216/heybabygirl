@@ -65,6 +65,11 @@ After the drink sequence, shake the thumbstick left and right or alternate A and
 
 ## Verification
 
+The return-to-apartment cinematic uses accelerated, staggered lunges, fog, pulsing
+crimson light and darkness, camera shake/roll, and impact blur. Reduced-motion
+preferences disable the shaking and pulses. The nightmare browser check captures
+its approach/contact and verifies reduced motion and a clean fire-escape retry.
+
 Run `npm test` for the simulation/storage checks. Run `npm run test:browser` for
 headless desktop/mobile browser checks (Edge on Windows; installed Playwright
 Chromium on other platforms). The browser checks also save screenshots under
