@@ -12,6 +12,23 @@ Move the apartment, fire escape, and street toward psychological horror through
 believable materials, deliberate light, environmental storytelling, and restrained
 sound. Preserve readable navigation and the existing keyboard/touch controls.
 
+## Dialogue and balcony audio pass
+
+- Stay quiet and listen reduces the apartment music gain from .26 to .12;
+  Crank the music back up restores it.
+- Take a sip crossfades from Corrupted Sector 7 into its pre-rendered reverse.
+  Reverse playback continues through waking/blackout and ends at the fire escape.
+  Nightmare retries and arcade waking start the reversed track from the beginning.
+- `src/assets/audio/light-rain-loop.wav` is the supplied Mixkit 2393 recording,
+  used for fireEscape and descent. Synthesized rain remains on the street and is
+  the fallback if the recording cannot play. All tracks share master/mute.
+- Reversed asset generation: `ffmpeg -i src/assets/audio/corrupted-sector-7.mp3
+  -af areverse -codec:a libmp3lame -q:a 3
+  src/assets/audio/corrupted-sector-7-reversed.mp3` (one command).
+- Production build, eight simulation tests, and the story/audio browser tests
+  pass. Browser tests inspect real Web Audio gains and media playback across
+  dialogue, sip, waking, fireEscape, descent, and return to party.
+
 ## Apartment atmosphere pass
 
 - `art/apartment/floor-lamp.blend`: editable Blender floor lamp.

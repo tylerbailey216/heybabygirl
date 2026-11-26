@@ -65,7 +65,7 @@ export function createGame(setbacks = {}, options = {}) {
     pursuer: { ...spots.entry }, elapsed: 0, entryAt: Infinity, reappearsAt: 0, encounters: 0,
     hidden: false, dragging: false, barricade: false, latch: 0,
     hasPin: false, examinedLatch: false, heardVoice: false, cinematicElapsed: 0, phoneElapsed: 0, streetChaseFailed: false,
-    arcade, setup, pinSpot, runTime: 0, closeEncounters: 0, searchRemaining: 0,
+    arcade, setup, pinSpot, runTime: 0, closeEncounters: 0, searchRemaining: 0, musicDucked: false,
   }
   const entityIndex = () => arcade ? Math.floor(setup / 3) : Math.min(game.encounters, entityTypes.length - 1)
   const currentEntity = () => entityTypes[entityIndex()]

@@ -72,7 +72,10 @@ Chromium on other platforms). The browser checks also save screenshots under
 
 The apartment uses the supplied **Corrupted Sector 7.mp3**, included under
 `src/assets/audio/`. It loops through the shared mute/master mix; the synthesized
-overworld theme remains outside. The party NPCs use a separate civilian character
+overworld theme remains outside. Listening lowers the apartment track; taking a
+sip switches to a pre-rendered reverse through the nightmare until the fire escape.
+The supplied Mixkit light rain loop plays on the fire escape and during descent.
+The party NPCs use a separate civilian character
 builder inspired by the supplied FedUP references. Heroine and shadow art remain
 separate and unchanged.
 

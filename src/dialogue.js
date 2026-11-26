@@ -4,9 +4,10 @@ export const dateDialogue = [
     speaker: 'Your date',
     text: 'Everyone else called it a night. Did you hear that knock a minute ago?',
     options: [
-      { label: 'Stay quiet and listen' },
+      { label: 'Stay quiet and listen', music: 'quiet' },
       {
         label: 'Crank the music back up',
+        music: 'loud',
         setback: { key: 'entry', value: .65, text: 'I felt the door shudder through the floor. The deadbolt sounded loose.' },
       },
     ],

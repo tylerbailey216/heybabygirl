@@ -245,6 +245,7 @@ function startArcade(setup = newSetup(game.arcade ? game.setup : -1)) {
 function choose(index) {
   if (game.phase === 'date' && !dateSetback) {
     const option = dateDialogue[beat].options[index]
+    if (option.music) game.musicDucked = option.music === 'quiet'
     if (option.setback) {
       dateSetback = option.setback.text
       if (!appliedSetbacks.has(beat)) {

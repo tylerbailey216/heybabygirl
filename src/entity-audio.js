@@ -1,5 +1,7 @@
 import { guestDepartureTimes } from './game.js'
 import apartmentTrackUrl from './assets/audio/corrupted-sector-7.mp3'
+import reversedTrackUrl from './assets/audio/corrupted-sector-7-reversed.mp3'
+import rainTrackUrl from './assets/audio/light-rain-loop.wav'
 
 let context
 let master
@@ -28,7 +30,29 @@ let apartmentTrack
 let apartmentGain
 let trackFailed = false
 let lastTrackFailed
+let lastMusicDucked
+let reversedTrack
+let reversedGain
+let rainTrack
+let rainGain
+let reversedFailed = false
+let rainFailed = false
+let lastReverseActive = false
+let lastRecordedRain = false
 const apartmentPhases = new Set(['party', 'date', 'sip', 'waking', 'blackout', 'breachIntro', 'returnNightmare'])
+const reversedPhases = new Set(['sip', 'waking', 'blackout', 'breachIntro', 'returnNightmare'])
+const balconyPhases = new Set(['fireEscape', 'descent'])
+
+function mediaLoop(url, onError) {
+  const media = new window.Audio(url)
+  media.loop = true
+  media.preload = 'auto'
+  media.addEventListener('error', onError)
+  const gain = context.createGain()
+  gain.gain.value = 0
+  context.createMediaElementSource(media).connect(gain).connect(master)
+  return { media, gain }
+}
 
 const rainyPhases = new Set(['fireEscape', 'street', 'streetDazed', 'streetRun', 'streetSafe', 'phoneDark', 'phoneRush', 'descent'])
 const beatInterval = .29
@@ -80,13 +104,15 @@ export function enableEntityAudio() {
     master = context.createGain()
     master.gain.value = muted ? 0 : .64
     master.connect(context.destination)
-    apartmentTrack = new window.Audio(apartmentTrackUrl)
-    apartmentTrack.loop = true
-    apartmentTrack.preload = 'auto'
-    apartmentTrack.addEventListener('error', () => { trackFailed = true })
-    apartmentGain = context.createGain()
-    apartmentGain.gain.value = 0
-    context.createMediaElementSource(apartmentTrack).connect(apartmentGain).connect(master)
+    const forward = mediaLoop(apartmentTrackUrl, () => { trackFailed = true })
+    apartmentTrack = forward.media
+    apartmentGain = forward.gain
+    const backward = mediaLoop(reversedTrackUrl, () => { reversedFailed = true })
+    reversedTrack = backward.media
+    reversedGain = backward.gain
+    const recordedRain = mediaLoop(rainTrackUrl, () => { rainFailed = true })
+    rainTrack = recordedRain.media
+    rainGain = recordedRain.gain
     music = context.createGain()
     music.gain.value = 0
     musicFilter = context.createBiquadFilter()
@@ -114,6 +140,8 @@ export function enableEntityAudio() {
   }
   if (context.state !== 'running' && context.state !== 'closed') context.resume().catch(() => {})
   if (apartmentTrack?.paused) apartmentTrack.play().then(() => { trackFailed = false }).catch(() => { trackFailed = true })
+  if (reversedTrack?.paused) reversedTrack.play().then(() => { reversedFailed = false }).catch(() => { reversedFailed = true })
+  if (rainTrack?.paused) rainTrack.play().then(() => { rainFailed = false }).catch(() => { rainFailed = true })
 }
 
 export function setAudioMuted(value) {
@@ -221,7 +249,16 @@ export function updateSceneAudio(game) {
   const { phase } = game
   const changed = phase !== lastPhase || game !== lastGame
   const inApartment = apartmentPhases.has(phase)
-  apartmentGain.gain.setTargetAtTime(inApartment && !trackFailed ? (phase === 'sip' ? .19 * Math.max(0, 1 - game.introElapsed / 4.2) : .26) : 0, now, .5)
+  const reverseActive = reversedPhases.has(phase)
+  const recordedRain = balconyPhases.has(phase)
+  if (reverseActive && (!lastReverseActive || game !== lastGame)) reversedTrack.currentTime = 0
+  if (recordedRain && (!lastRecordedRain || game !== lastGame)) rainTrack.currentTime = 0
+  lastReverseActive = reverseActive
+  lastRecordedRain = recordedRain
+  const apartmentFailed = reverseActive ? reversedFailed : trackFailed
+  apartmentGain.gain.setTargetAtTime(inApartment && !reverseActive && !trackFailed ? (game.musicDucked ? .12 : .26) : 0, now, .4)
+  reversedGain.gain.setTargetAtTime(reverseActive && !reversedFailed ? .26 : 0, now, .4)
+  rainGain.gain.setTargetAtTime(recordedRain && !rainFailed ? .32 : 0, now, .6)
   if (changed) {
     lastPhase = phase
     lastGame = game
@@ -242,12 +279,13 @@ export function updateSceneAudio(game) {
   const sipFalloff = Math.max(0, 1 - Math.max(0, game.introElapsed - .45) / 1.15)
   const roomSound = phase === 'party' ? remaining / 8
     : phase === 'date' ? .28 : phase === 'sip' ? .28 * sipFalloff : 0
-  if (trackFailed !== lastTrackFailed || Math.abs(roomSound - lastRoomSound) >= .004 || (roomSound === 0 && lastRoomSound !== 0)) {
-    music.gain.setTargetAtTime(trackFailed ? .27 * roomSound : 0, now, .14)
+  if (game.musicDucked !== lastMusicDucked || apartmentFailed !== lastTrackFailed || Math.abs(roomSound - lastRoomSound) >= .004 || (roomSound === 0 && lastRoomSound !== 0)) {
+    music.gain.setTargetAtTime(apartmentFailed ? .27 * roomSound * (game.musicDucked ? .46 : 1) : 0, now, .14)
     musicFilter.frequency.setTargetAtTime(550 + roomSound * 1850, now, .2)
     crowd.gain.setTargetAtTime(.16 * roomSound, now, .19)
     lastRoomSound = roomSound
-    lastTrackFailed = trackFailed
+    lastTrackFailed = apartmentFailed
+    lastMusicDucked = game.musicDucked
   }
   const raining = rainyPhases.has(phase)
   const uneasyRoom = phase === 'waking' || phase === 'blackout' || phase === 'returnNightmare'
@@ -272,9 +310,10 @@ export function updateSceneAudio(game) {
     }
     nextPulse = now + 1.25 - threat * .5
   }
-  if (raining !== lastRaining) {
-    rain.gain.setTargetAtTime(raining ? .14 : 0, now, .25)
-    lastRaining = raining
+  const syntheticRain = raining && (!recordedRain || rainFailed)
+  if (syntheticRain !== lastRaining) {
+    rain.gain.setTargetAtTime(syntheticRain ? .14 : 0, now, .25)
+    lastRaining = syntheticRain
   }
   if (roomSound > 0) {
     if (nextBeat < now - .1) nextBeat = now
@@ -284,7 +323,7 @@ export function updateSceneAudio(game) {
     }
   }
 
-  const overworldActive = overworldPhases.has(phase) && (!inApartment || trackFailed)
+  const overworldActive = overworldPhases.has(phase) && (!inApartment || apartmentFailed)
   const energy = overworldEnergy(phase)
   overworldMusic.gain.setTargetAtTime(overworldActive ? .29 : 0, now, overworldActive ? .22 : .12)
   overworldFilter.frequency.setTargetAtTime(720 + energy * 1350, now, .24)

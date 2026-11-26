@@ -21,7 +21,7 @@ test('story starts locked with the supplied apartment music and party scene', as
     const NativeAudio = window.Audio
     window.Audio = function (...args) {
       const audio = new NativeAudio(...args)
-      window.testTrack = audio
+      if (String(args[0]).includes('corrupted-sector-7.mp3')) window.testTrack = audio
       return audio
     }
   })
@@ -35,6 +35,70 @@ test('story starts locked with the supplied apartment music and party scene', as
   await page.screenshot({ path: 'test-results/party-desktop.png' })
   await page.locator('#sound-toggle').click()
   await expect(page.locator('#sound-toggle')).toHaveAttribute('aria-pressed', 'true')
+  expect(errors).toEqual([])
+})
+
+test('dialogue ducks music, sip reverses it, and fire escape switches to recorded rain', async ({ page }) => {
+  const errors = []
+  page.on('pageerror', error => errors.push(error.message))
+  await page.addInitScript(() => {
+    window.testRoutes = []
+    const proto = (window.AudioContext || window.webkitAudioContext).prototype
+    const createSource = proto.createMediaElementSource
+    proto.createMediaElementSource = function (media) {
+      const source = createSource.call(this, media)
+      const connect = source.connect.bind(source)
+      source.connect = (gain, ...args) => {
+        window.testRoutes.push({ media, gain })
+        return connect(gain, ...args)
+      }
+      return source
+    }
+    const raf = window.requestAnimationFrame.bind(window)
+    window.requestAnimationFrame = callback => raf(time => {
+      if (!window.testFreeze) callback(time)
+    })
+  })
+  const level = name => page.evaluate(name => window.testRoutes.find(route => route.media.src.includes(name))?.gain.gain.value ?? -1, name)
+  await page.goto('/')
+  await page.locator('#begin').click()
+  await expect(page.locator('#game')).toHaveAttribute('data-phase', 'date', { timeout: 35000 })
+  await expect.poll(() => level('corrupted-sector-7.mp3')).toBeGreaterThan(.24)
+  await page.getByRole('button', { name: 'Stay quiet and listen', exact: true }).click()
+  await expect.poll(() => level('corrupted-sector-7.mp3')).toBeLessThan(.15)
+  await page.getByRole('button', { name: 'Remember where the pin is', exact: true }).click()
+  await page.getByRole('button', { name: 'Take a sip', exact: true }).click()
+  await expect(page.locator('#game')).toHaveAttribute('data-phase', 'sip')
+  await expect.poll(() => level('corrupted-sector-7-reversed.mp3')).toBeGreaterThan(.2)
+  await expect.poll(() => level('corrupted-sector-7.mp3')).toBeLessThan(.03)
+  await expect(page.locator('#game')).toHaveAttribute('data-phase', 'waking', { timeout: 15000 })
+  await expect.poll(() => level('corrupted-sector-7-reversed.mp3')).toBeGreaterThan(.24)
+  // Exercise the audio module against real Web Audio nodes without a chase
+  // changing phases underneath the assertions.
+  await page.evaluate(() => { window.testFreeze = true })
+  await page.evaluate(async () => {
+    const { createGame } = await import('/src/game.js')
+    const { updateSceneAudio } = await import('/src/entity-audio.js')
+    window.testGame = createGame()
+    window.testGame.phase = 'fireEscape'
+    updateSceneAudio(window.testGame)
+  })
+  await expect.poll(() => level('light-rain-loop.wav')).toBeGreaterThan(.25)
+  await expect.poll(() => level('corrupted-sector-7-reversed.mp3')).toBeLessThan(.03)
+  await expect.poll(() => page.evaluate(() => window.testRoutes.find(route => route.media.src.includes('light-rain-loop.wav')).media.currentTime)).toBeGreaterThan(0)
+  await page.evaluate(async () => {
+    window.testGame.phase = 'descent'
+    const { updateSceneAudio } = await import('/src/entity-audio.js')
+    updateSceneAudio(window.testGame)
+  })
+  await expect.poll(() => level('light-rain-loop.wav')).toBeGreaterThan(.3)
+  await page.evaluate(async () => {
+    window.testGame.phase = 'party'
+    const { updateSceneAudio } = await import('/src/entity-audio.js')
+    updateSceneAudio(window.testGame)
+  })
+  await expect.poll(() => level('light-rain-loop.wav')).toBeLessThan(.03)
+  await expect.poll(() => level('corrupted-sector-7.mp3')).toBeGreaterThan(.24)
   expect(errors).toEqual([])
 })
 
