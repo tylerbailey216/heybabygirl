@@ -1,4 +1,5 @@
 import { guestDepartureTimes } from './game.js'
+import apartmentTrackUrl from './assets/audio/corrupted-sector-7.mp3'
 
 let context
 let master
@@ -23,6 +24,11 @@ let roomTone
 let nextCreak = 0
 let nextPulse = 0
 let creakIndex = 0
+let apartmentTrack
+let apartmentGain
+let trackFailed = false
+let lastTrackFailed
+const apartmentPhases = new Set(['party', 'date', 'sip', 'waking', 'blackout', 'breachIntro', 'returnNightmare'])
 
 const rainyPhases = new Set(['fireEscape', 'street', 'streetDazed', 'streetRun', 'streetSafe', 'phoneDark', 'phoneRush', 'descent'])
 const beatInterval = .29
@@ -74,6 +80,13 @@ export function enableEntityAudio() {
     master = context.createGain()
     master.gain.value = muted ? 0 : .64
     master.connect(context.destination)
+    apartmentTrack = new window.Audio(apartmentTrackUrl)
+    apartmentTrack.loop = true
+    apartmentTrack.preload = 'auto'
+    apartmentTrack.addEventListener('error', () => { trackFailed = true })
+    apartmentGain = context.createGain()
+    apartmentGain.gain.value = 0
+    context.createMediaElementSource(apartmentTrack).connect(apartmentGain).connect(master)
     music = context.createGain()
     music.gain.value = 0
     musicFilter = context.createBiquadFilter()
@@ -100,6 +113,7 @@ export function enableEntityAudio() {
     roomTone = bed(makeNoise(5.3, t => .55 + .12 * Math.sin(t * 1.3)), 'lowpass', 145, .6)
   }
   if (context.state !== 'running' && context.state !== 'closed') context.resume().catch(() => {})
+  if (apartmentTrack?.paused) apartmentTrack.play().then(() => { trackFailed = false }).catch(() => { trackFailed = true })
 }
 
 export function setAudioMuted(value) {
@@ -206,6 +220,8 @@ export function updateSceneAudio(game) {
   const now = context.currentTime
   const { phase } = game
   const changed = phase !== lastPhase || game !== lastGame
+  const inApartment = apartmentPhases.has(phase)
+  apartmentGain.gain.setTargetAtTime(inApartment && !trackFailed ? (phase === 'sip' ? .19 * Math.max(0, 1 - game.introElapsed / 4.2) : .26) : 0, now, .5)
   if (changed) {
     lastPhase = phase
     lastGame = game
@@ -226,11 +242,12 @@ export function updateSceneAudio(game) {
   const sipFalloff = Math.max(0, 1 - Math.max(0, game.introElapsed - .45) / 1.15)
   const roomSound = phase === 'party' ? remaining / 8
     : phase === 'date' ? .28 : phase === 'sip' ? .28 * sipFalloff : 0
-  if (Math.abs(roomSound - lastRoomSound) >= .004 || (roomSound === 0 && lastRoomSound !== 0)) {
-    music.gain.setTargetAtTime(.27 * roomSound, now, .14)
+  if (trackFailed !== lastTrackFailed || Math.abs(roomSound - lastRoomSound) >= .004 || (roomSound === 0 && lastRoomSound !== 0)) {
+    music.gain.setTargetAtTime(trackFailed ? .27 * roomSound : 0, now, .14)
     musicFilter.frequency.setTargetAtTime(550 + roomSound * 1850, now, .2)
     crowd.gain.setTargetAtTime(.16 * roomSound, now, .19)
     lastRoomSound = roomSound
+    lastTrackFailed = trackFailed
   }
   const raining = rainyPhases.has(phase)
   const uneasyRoom = phase === 'waking' || phase === 'blackout' || phase === 'returnNightmare'
@@ -267,7 +284,7 @@ export function updateSceneAudio(game) {
     }
   }
 
-  const overworldActive = overworldPhases.has(phase)
+  const overworldActive = overworldPhases.has(phase) && (!inApartment || trackFailed)
   const energy = overworldEnergy(phase)
   overworldMusic.gain.setTargetAtTime(overworldActive ? .29 : 0, now, overworldActive ? .22 : .12)
   overworldFilter.frequency.setTargetAtTime(720 + energy * 1350, now, .24)

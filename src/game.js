@@ -44,14 +44,32 @@ const furniture = [
 ]
 export const distance = (a, b) => Math.hypot(a.x - b.x, a.z - b.z)
 
-export function createGame(setbacks = {}) {
+export const pinLocations = [
+  { name: 'sideboard', x: -2.45, z: -2.53, clue: 'A drawer is half open beneath the picture.' },
+  { name: 'bookshelf', x: -4.65, z: 1.25, clue: 'Something silver slipped between the books.' },
+  { name: 'sofa', x: 2.3, z: 1.9, clue: 'A cushion is raised. Metal catches the lamplight.' },
+]
+export function newSetup(previous = -1, random = Math.random) {
+  // Pick one of the other eight combinations; New run always changes something.
+  const pick = Math.floor(random() * (previous < 0 ? 9 : 8))
+  return previous < 0 ? pick : pick >= previous ? pick + 1 : pick
+}
+
+export function createGame(setbacks = {}, options = {}) {
+  const arcade = options.mode === 'arcade'
+  const setup = Math.max(0, Math.min(8, Math.trunc(options.setup || 0)))
+  const pinSpot = pinLocations[arcade ? setup % 3 : 0]
   const penalties = { entry: 0, latch: 0, darkness: 0, ...setbacks }
   const game = {
     phase: 'party', introElapsed: 0, wakeProgress: 0, penalties, player: { ...start }, table: { ...tableStart },
     pursuer: { ...spots.entry }, elapsed: 0, entryAt: Infinity, reappearsAt: 0, encounters: 0,
     hidden: false, dragging: false, barricade: false, latch: 0,
     hasPin: false, examinedLatch: false, heardVoice: false, cinematicElapsed: 0, phoneElapsed: 0, streetChaseFailed: false,
+    arcade, setup, pinSpot, runTime: 0, closeEncounters: 0, searchRemaining: 0,
   }
+  const entityIndex = () => arcade ? Math.floor(setup / 3) : Math.min(game.encounters, entityTypes.length - 1)
+  const currentEntity = () => entityTypes[entityIndex()]
+  let nearThreat = false
 
   function clear(x, z, actor) {
     const margin = 0.23
@@ -79,7 +97,7 @@ export function createGame(setbacks = {}) {
     if (distance(game.player, spots.balcony) < 1.08) {
       return game.hasPin ? 'Open balcony latch' : 'Inspect jammed latch'
     }
-    if (!game.hasPin && distance(game.player, spots.drawer) < .83) return 'Search sideboard'
+    if (!game.hasPin && distance(game.player, pinSpot) < .83) return `Search ${pinSpot.name}`
     if (game.entryAt === Infinity && distance(game.player, spots.entry) < 1.13) return 'Check deadbolt'
     if (distance(game.player, spots.coats) < 0.9) return 'Hide behind coats'
     if (!game.barricade && game.elapsed < game.entryAt && distance(game.player, game.table) < 1.85) return 'Grab dining table'
@@ -101,12 +119,14 @@ export function createGame(setbacks = {}) {
         break
       case 'Inspect jammed latch': game.examinedLatch = true; break
       case 'Search sideboard':
-        game.hasPin = true
-        triggerBreach()
+      case 'Search bookshelf':
+      case 'Search sofa':
+        if (arcade) game.searchRemaining ||= 3
+        else { game.hasPin = true; triggerBreach() }
         break
       case 'Check deadbolt': triggerBreach(); break
       case 'Open balcony latch': game.latch ||= 2.5 + penalties.latch; break
-      case 'Step onto street': game.phase = 'street'; break
+      case 'Step onto street': game.phase = arcade ? 'complete' : 'street'; break
       case 'Listen': game.heardVoice = true; break
       case 'Look up': game.phase = 'descent'; break
       case 'End chapter': game.phase = 'complete'; break
@@ -129,7 +149,7 @@ export function createGame(setbacks = {}) {
   }
 
   let breachResume
-  let breachSeen = false
+  let breachSeen = arcade && Boolean(options.skipReveal)
   function continueBreach() {
     if (game.phase !== 'breachIntro') return
     game.phase = breachResume
@@ -139,7 +159,7 @@ export function createGame(setbacks = {}) {
   function beginWake() {
     game.phase = 'waking'
     game.elapsed = 0
-    game.entryAt = Math.max(.3, 1.55 - penalties.entry)
+    game.entryAt = arcade ? Infinity : Math.max(.3, 1.55 - penalties.entry)
   }
 
   function beginPhoneTrap() {
@@ -210,6 +230,7 @@ export function createGame(setbacks = {}) {
   }
 
   function update(dt, inputX, inputZ) {
+    if (arcade && (game.phase === 'blackout' || game.phase === 'fireEscape')) game.runTime += dt
     if (game.phase === 'party' || game.phase === 'sip') {
       game.introElapsed += dt
       if (game.phase === 'party' && game.introElapsed >= partyDuration) game.phase = 'date'
@@ -282,6 +303,11 @@ export function createGame(setbacks = {}) {
       game.player.x = Math.max(-5.12, Math.min(5.12, game.player.x + inputX * step))
       game.player.z = Math.max(-.65, Math.min(.65, game.player.z + inputZ * step))
       if (inputX < 0 && game.player.x <= spots.returnDoor.x) {
+        if (arcade) {
+          game.phase = 'caught'
+          game.lossReason = 'You turned back into the apartment. The way out was to the right.'
+          return
+        }
         Object.assign(game.player, spots.returnHeroine)
         game.cinematicElapsed = 0
         game.phase = 'returnNightmare'
@@ -298,12 +324,16 @@ export function createGame(setbacks = {}) {
     }
     game.elapsed += dt
     if (waking) shake(inputX, inputZ, length, game.elapsed)
-    if (waking && game.wakeProgress === wakeGoal && game.elapsed - lastShakeAt >= .16) game.phase = 'blackout'
+    if (waking && game.wakeProgress === wakeGoal && game.elapsed - lastShakeAt >= .16) {
+      game.phase = 'blackout'
+      if (arcade) game.entryAt = game.elapsed + 9
+    }
     if (!waking && !game.hidden && length) {
       const speed = game.dragging ? 1.8 : 3.35
       const x = game.player.x
       const z = game.player.z
       game.latch = 0
+      game.searchRemaining = 0
       move(game.player, inputX / normalizer * speed * dt, inputZ / normalizer * speed * dt)
       if (game.dragging) {
         game.table.x += game.player.x - x
@@ -319,7 +349,13 @@ export function createGame(setbacks = {}) {
       }
     }
     if (entityInside()) {
-      const entity = entityTypes[game.encounters]
+      const entity = currentEntity()
+      const proximity = distance(game.player, game.pursuer)
+      if (!game.hidden && proximity < 1.5) nearThreat = true
+      if (nearThreat && (game.hidden || proximity > 2.2)) {
+        game.closeEncounters++
+        nearThreat = false
+      }
       const patrol = game.elapsed % 10 < 5 ? { x: 0, z: 1.4 } : { x: 2.85, z: -2.1 }
       const target = game.hidden ? patrol : game.player
       repath -= dt
@@ -334,7 +370,7 @@ export function createGame(setbacks = {}) {
       }
       if (!game.hidden && distance(game.player, game.pursuer) < entity.reach) {
         game.encounters++
-        if (game.encounters >= encounterLimit) {
+        if (arcade || game.encounters >= encounterLimit) {
           game.phase = 'caught'
           return
         }
@@ -342,6 +378,10 @@ export function createGame(setbacks = {}) {
         Object.assign(game.pursuer, game.barricade ? { x: -4.9, z: -1.45 } : spots.entry)
         waypoint = undefined
       }
+    }
+    if (game.searchRemaining > 0 && !game.hidden && !length) {
+      game.searchRemaining = Math.max(0, game.searchRemaining - dt)
+      if (!game.searchRemaining) { game.hasPin = true; triggerBreach() }
     }
     if (game.latch > 0) {
       game.latch -= dt
@@ -360,5 +400,5 @@ export function createGame(setbacks = {}) {
     return game.phase !== 'breachIntro' && game.elapsed >= entityArrivalAt()
   }
 
-  return Object.assign(game, { action, interact, update, entityArrivalAt, entityInside, continueBreach, beginSip, beginWake, beginPhoneTrap, retryStreet, retryFireEscape })
+  return Object.assign(game, { action, interact, update, entityArrivalAt, entityInside, continueBreach, beginSip, beginWake, beginPhoneTrap, retryStreet, retryFireEscape, entityIndex, currentEntity })
 }

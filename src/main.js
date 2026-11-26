@@ -1,6 +1,8 @@
 import './style.css'
 import { createGame, descentDuration, descentFadeAt, encounterLimit, entityTypes, phoneRushDuration, returnDuration, returnFadeAt, returnReachAt, sipDuration, streetLightFade, streetWakeSeconds, wakeGoal } from './game.js'
 import { dateDialogue, streetDialogue } from './dialogue.js'
+import { newSetup } from './game.js'
+import { loadProgress, saveProgress, recordEscape, scoreRun, formatTime } from './arcade.js'
 import { createView } from './view.js'
 import { bindThumbstick } from './thumbstick.js'
 import { enableEntityAudio, playEntitySound, setAudioMuted, updateSceneAudio } from './entity-audio.js'
@@ -33,6 +35,19 @@ const restartButton = document.querySelector('#restart')
 const soundToggle = document.querySelector('#sound-toggle')
 const startPanel = document.querySelector('#start-demo')
 const startButton = document.querySelector('#begin')
+const arcadeStart = document.querySelector('#arcade-start')
+const newRun = document.querySelector('#new-run')
+const storyReturn = document.querySelector('#story-return')
+const runResult = document.querySelector('#run-result')
+const arcadeHud = document.querySelector('#arcade-hud')
+const runClock = document.querySelector('#run-clock')
+const runClue = document.querySelector('#run-clue')
+let storage
+try { storage = window.localStorage } catch {}
+const progress = loadProgress(storage)
+let savedLocally = true
+let recordedGame
+let isNewBest = false
 const wakePanel = document.querySelector('#wake-panel')
 const wakeInstructions = document.querySelector('#wake-instructions')
 const wakeTimer = document.querySelector('#wake-timer')
@@ -58,7 +73,7 @@ const touch = document.querySelector('#touch')
 const itemButtons = [
   { element: document.querySelector('#table-action'), labels: new Map([['Grab dining table', 'Grab table'], ['Let go of table', 'Release table']]), idle: 'Table' },
   { element: document.querySelector('#coats-action'), labels: new Map([['Hide behind coats', 'Hide'], ['Leave hiding spot', 'Leave coats']]), idle: 'Hide' },
-  { element: document.querySelector('#inspect-action'), labels: new Map([['Search sideboard', 'Search'], ['Check deadbolt', 'Deadbolt'], ['Step onto street', 'Step down']]), idle: 'Inspect', outside: true },
+  { element: document.querySelector('#inspect-action'), labels: new Map([['Search sideboard', 'Search'], ['Search bookshelf', 'Search'], ['Search sofa', 'Search'], ['Check deadbolt', 'Deadbolt'], ['Step onto street', 'Step down']]), idle: 'Inspect', outside: true },
   { element: document.querySelector('#latch-action'), labels: new Map([['Inspect jammed latch', 'Check latch'], ['Open balcony latch', 'Open latch']]), idle: 'Latch' },
 ]
 const stick = bindThumbstick(document.querySelector('#thumbstick'))
@@ -90,15 +105,52 @@ function present() {
   const { phase } = game
   const waking = phase === 'waking' || phase === 'streetDazed'
   const playing = waking || phase === 'blackout' || phase === 'fireEscape' || phase === 'phoneDark' || phase === 'streetRun'
-  const speaking = phase === 'date' || phase === 'caught' || phase === 'phoneCaught' || phase === 'streetSafe' || phase === 'returnCaught'
+  const speaking = (!game.arcade && phase === 'caught') || phase === 'date' || phase === 'phoneCaught' || phase === 'streetSafe' || phase === 'returnCaught'
+  const results = phase === 'complete' || (game.arcade && phase === 'caught')
+  if (phase === 'breachIntro' && !progress.seen.includes(game.entityIndex())) {
+    progress.seen.push(game.entityIndex())
+    savedLocally = saveProgress(storage, progress)
+  }
+  if (phase === 'complete' && recordedGame !== game) {
+    recordedGame = game
+    isNewBest = recordEscape(progress, game)
+    savedLocally = saveProgress(storage, progress)
+  }
+  arcadeStart.disabled = !progress.unlocked
+  arcadeStart.textContent = progress.unlocked ? 'After Midnight' : 'After Midnight · Locked'
+  document.querySelector('#unlock-note').textContent = progress.unlocked ? 'New setup. Same nightmare. Beat your best.' : 'Escape Story mode to unlock After Midnight.'
+  arcadeHud.hidden = !game.arcade || !playing || waking || !started
+  runClue.textContent = `${game.currentEntity().name} · ${['Keep your distance.', 'Slower, but a longer reach.', 'Fast. Consider the barricade.'][game.entityIndex()]} ${game.pinSpot.clue}`
   gameScreen.dataset.phase = phase
   startPanel.hidden = started
   restartButton.hidden = !started
   soundToggle.hidden = !started
   dialogueLayer.hidden = !speaking
   breachSplash.hidden = phase !== 'breachIntro'
+  if (phase === 'breachIntro') {
+    breachImage.src = game.entityIndex() === 0 ? breachArt : entityPortraits[game.entityIndex()]
+    breachImage.alt = `${game.currentEntity().name} appears at the apartment door`
+    document.querySelector('#breach-title').textContent = `${game.currentEntity().name}. It's inside.`
+  }
   streetEnding.hidden = phase !== 'street'
-  endingSplash.hidden = phase !== 'complete'
+  endingSplash.hidden = !results
+  endingSplash.classList.toggle('arcade-results', game.arcade)
+  endingImage.src = game.arcade && phase === 'caught' ? (game.entityIndex() === 0 ? breachArt : entityPortraits[game.entityIndex()]) : splashArt
+  endingImage.alt = game.arcade && phase === 'caught' ? `${game.currentEntity().name} caught the heroine` : 'The heroine in the rain after leaving the apartment'
+  runResult.hidden = !results || !game.arcade
+  newRun.hidden = !results || !progress.unlocked
+  newRun.textContent = game.arcade ? 'New run' : 'Play After Midnight'
+  storyReturn.hidden = !results || !game.arcade
+  endingRestart.textContent = game.arcade ? 'Retry this setup' : 'Play Story again'
+  document.querySelector('.ending-chapter').textContent = game.arcade ? `After Midnight · Setup ${game.setup + 1}` : 'End of Chapter One'
+  document.querySelector('#ending-title').textContent = game.arcade && phase === 'caught' ? 'Caught after midnight' : 'Hey Baby Girl'
+  document.querySelector('.ending-subtitle').textContent = game.arcade ? (phase === 'caught' ? game.lossReason || `${game.currentEntity().name} caught you. Try the barricade or break away into hiding.` : 'You made it out.') : 'Blackout Date'
+  if (results && game.arcade) {
+    const best = progress.bests[game.setup]
+    runResult.textContent = phase === 'caught' ? `Run ended at ${formatTime(game.runTime)}. Retry keeps the pin and shadow the same.`
+      : `${formatTime(game.runTime)} · ${game.closeEncounters} close escapes · ${scoreRun(game)} points. ${isNewBest ? 'NEW PERSONAL BEST! ' : ''}Best for this setup: ${best.score} pts · fastest ${formatTime(best.time)}.`
+    if (!savedLocally) runResult.textContent += ' Phone storage unavailable; records last for this session.'
+  }
   touch.hidden = !playing || !hasTouch.matches
   if (touch.hidden) stick.reset()
   wakePanel.hidden = !waking
@@ -158,6 +210,7 @@ function showChoices(group, buttons, options) {
 }
 
 function reset(retryNightmare = false) {
+  if (game.arcade) return startArcade(game.setup)
   if (retryNightmare) enableEntityAudio()
   game = createGame(retryNightmare ? game.penalties : undefined)
   if (retryNightmare) game.beginWake()
@@ -169,6 +222,21 @@ function reset(retryNightmare = false) {
   voiceEndsAt = 0
   wasInside = false
   entityCue.hidden = true
+  held.clear()
+  stick.reset()
+  present()
+}
+
+function startArcade(setup = newSetup(game.arcade ? game.setup : -1)) {
+  if (!progress.unlocked) return
+  enableEntityAudio()
+  started = true
+  game = createGame({}, { mode: 'arcade', setup, skipReveal: progress.seen.includes(Math.floor(setup / 3)) })
+  game.beginWake()
+  recordedGame = undefined
+  shownEntity = -1
+  voiceEndsAt = 0
+  wasInside = false
   held.clear()
   stick.reset()
   present()
@@ -206,6 +274,7 @@ function choose(index) {
 }
 
 function next() {
+  if (game.arcade && (game.phase === 'caught' || game.phase === 'complete')) return startArcade(game.setup)
   if (game.phase === 'breachIntro') {
     held.clear()
     stick.reset()
@@ -265,6 +334,13 @@ if (view) {
   endingImage.src = splashArt
   present()
   startButton.addEventListener('click', startDemo)
+  arcadeStart.addEventListener('click', () => startArcade())
+  newRun.addEventListener('click', () => startArcade())
+  storyReturn.addEventListener('click', () => {
+    game = createGame()
+    reset()
+    enableEntityAudio()
+  })
   soundToggle.addEventListener('click', toggleSound)
   advance.addEventListener('click', next)
   breachContinue.addEventListener('click', next)
@@ -335,7 +411,7 @@ if (view) {
     const keyboardX = Number(pressed('d', 'ArrowRight')) - Number(pressed('a', 'ArrowLeft'))
     const keyboardZ = Number(pressed('s', 'ArrowDown')) - Number(pressed('w', 'ArrowUp'))
     const usingKeyboard = keyboardX !== 0 || keyboardZ !== 0
-    if (started) {
+    if (started && !document.hidden) {
       game.update(dt, usingKeyboard ? keyboardX : stick.x, usingKeyboard ? keyboardZ : stick.z)
       updateSceneAudio(game)
     }
@@ -345,11 +421,11 @@ if (view) {
       if (!dialogueLayer.hidden) (advance.hidden ? dateButtons[0] : advance).focus()
       else if (game.phase === 'breachIntro') {
         breachContinue.focus()
-        shownEntity = game.encounters
+        shownEntity = game.entityIndex()
         playEntitySound('Door')
         playEntitySound(entityTypes[shownEntity].voice, .42)
       } else if (game.phase === 'street') streetButtons[0].focus()
-      else if (game.phase === 'complete') endingRestart.focus()
+      else if (game.phase === 'complete' || (game.arcade && game.phase === 'caught')) endingRestart.focus()
       if (game.phase === 'phoneRush' || game.phase === 'streetRun') playEntitySound('Hiss')
       if (game.phase === 'returnNightmare') playEntitySound('Growl')
       if (game.phase === 'streetRun' || game.phase === 'returnNightmare' || game.phase === 'breachIntro') {
@@ -374,10 +450,10 @@ if (view) {
     const prompt = game.action()
     const arrivalAt = game.entityArrivalAt()
     const entityInside = (playing || waking) && game.entityInside()
-    if (entityInside && !wasInside && game.encounters > 0) playEntitySound('Door')
+    if (entityInside && !wasInside && (game.arcade || game.encounters > 0)) playEntitySound('Door')
     wasInside = entityInside
-    if (playing && entityInside && game.elapsed >= arrivalAt + entityEntranceBeat && shownEntity !== game.encounters) {
-      shownEntity = game.encounters
+    if (playing && entityInside && game.elapsed >= arrivalAt + entityEntranceBeat && shownEntity !== game.entityIndex()) {
+      shownEntity = game.entityIndex()
       entityPortrait.src = entityPortraits[shownEntity]
       playEntitySound(entityTypes[shownEntity].voice)
       voiceEndsAt = game.elapsed + 1.8
@@ -417,12 +493,13 @@ if (view) {
     else if (Number.isFinite(secondsToArrival)) {
       timing = `${game.encounters ? 'Returns' : 'Door bursts open'} in ${secondsToArrival}s`
     }
-    let hint = game.hasPin ? 'Release pin found · Head to the balcony' : 'Check the balcony latch or search the sideboard'
+    let hint = game.hasPin ? 'Release pin found · Head to the balcony' : game.arcade ? game.pinSpot.clue : 'Check the balcony latch or search the sideboard'
     if (prompt) hint = prompt
     if (game.examinedLatch && !game.hasPin && (!prompt || prompt === 'Inspect jammed latch')) {
-      hint = 'Latch jammed · Find the release pin in the sideboard'
+      hint = game.arcade ? `Latch jammed · ${game.pinSpot.clue}` : 'Latch jammed · Find the release pin in the sideboard'
     }
-    if (game.latch > 0) hint = 'Opening the latch… Hold still'
+    if (game.searchRemaining > 0) hint = `Searching… Hold still ${Math.ceil(game.searchRemaining)}s`
+    else if (game.latch > 0) hint = 'Opening the latch… Hold still'
     else if (game.dragging) hint = 'Drag the table toward the entry'
     else if (game.hidden) hint = 'Hidden · Interact to leave the coats'
     else if (game.barricade && game.elapsed < game.entryAt && !prompt) hint = game.hasPin ? 'Entry blocked · Head to the balcony' : 'Entry blocked · Find the release pin'
@@ -430,6 +507,7 @@ if (view) {
     const message = streetRun ? 'Run right · Reach the lit intersection' : outside ? (prompt ? 'Street level · Step down' : 'Fire escape · Follow the stairs to the right')
       : playing ? `${timing} · ${hint}${encounters}` : ''
     if (message !== statusLine.textContent) statusLine.textContent = message
+    if (game.arcade) runClock.textContent = formatTime(game.runTime)
     status.hidden = !message
     for (const { element, labels, idle, outside: outdoorButton } of itemButtons) {
       element.hidden = waking || streetDazed || streetRun || phoneDark || (outside && !outdoorButton)

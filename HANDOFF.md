@@ -34,6 +34,34 @@ Dependency downloads may require network permission. `.npm-cache/` is ignored.
 
 ## Next passes
 
+### After Midnight prototype
+
+Arcade unlocks after a completed Story escape and persists on the current origin.
+Nine deterministic setups pair three clue-backed pin spots with three shadows.
+Retries retain the setup; new runs change it. Arcade finishes at the street exit
+without the authored street dialogue/cinematics. One capture or returning inside
+ends a run. Results use the existing 1980s ending art; failures use the existing
+breach art. No new heroine or shadow artwork was generated.
+
+Run scoring, first-time reveals, storage fallback, and every pin-to-balcony route
+are covered by `npm test`. `npm run test:browser` exercises the mobile interface and
+apartment soundtrack. The short apartment currently plays as a sprint: the
+two-to-three-minute target needs additional pacing/content work and phone playtests.
+
+The user-supplied apartment track is in `src/assets/audio/`. It replaces the
+synthesized music indoors; the newer overworld theme is preserved outdoors.
+Partygoers now have a dedicated rounded civilian model builder. Keep the heroine,
+partygoers, date character, and shadow entities' visual identities independent.
+
+Validation: production build, eight simulation/storage tests, and headless Edge
+desktop/mobile browser flows passed. Browser checks confirm apartment music
+playback, mute UI, unlock persistence, loss results, retry and new-run behavior.
+Captures are under ignored `test-results/`; physical iPhone input and subjective
+audio balance still need human playtesting. CI now runs simulation tests before
+building and deploying Pages.
+
+### Earlier atmosphere pass
+
 Validation for this pass: JavaScript syntax checks, GLB structure checks, and the
 Vite production build passed. The build reports a JavaScript chunk over 500 kB.
 Browser control was unavailable, so visual, listening, and physical phone checks

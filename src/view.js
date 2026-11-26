@@ -271,6 +271,14 @@ export function createView(container) {
   // Narrow moonlit stripes suggest blinds without adding shadow-map cost.
   const stripes = new T.Group()
   room.add(stripes)
+  const pinClue = new T.Mesh(new T.CylinderGeometry(.018, .018, .18, 8), new T.MeshStandardMaterial({
+    color: '#e2d7b3', metalness: .7, roughness: .3, emissive: '#77694c', emissiveIntensity: .25,
+  }))
+  pinClue.rotation.z = Math.PI / 2
+  room.add(pinClue)
+  const openDrawer = box(room, '#855246', -2.45, .51, -3.10, .58, .57, .24)
+  const raisedCushion = box(room, '#c08a7e', 2.3, .8, 2.7, .76, .18, .68)
+  raisedCushion.rotation.x = -.22
   for (let i = 0; i < 7; i++) {
     const stripe = new T.Mesh(new T.PlaneGeometry(.085, 2.8), new T.MeshBasicMaterial({
       color: '#8faec9', transparent: true, opacity: .09, depthWrite: false,
@@ -336,6 +344,46 @@ export function createView(container) {
   const poseHeroine = createHeroine(scene, player.group)
   const heroineShadow = contact(room, 0, 0, 1.05, .65, .75)
   const date = character('date')
+  // Party-only proportions: the heroine and shadow builders stay independent.
+  function partyGuest(palette, index) {
+    const group = new T.Group()
+    scene.add(group)
+    const legs = []
+    const arms = []
+    const denim = ['#3e526f', '#574451', '#383d47'][index % 3]
+    for (const side of [-1, 1]) {
+      const leg = new T.Group()
+      leg.position.set(side * .15, .61, 0)
+      group.add(leg)
+      oval(leg, denim, 0, -.22, 0, .145, .27, .16)
+      oval(leg, '#302a2b', 0, -.49, .07, .16, .095, .23)
+      legs.push(leg)
+      oval(group, palette.shirt, side * .32, .86, 0, .14, .23, .15).rotation.z = side * .24
+      const hand = oval(group, palette.skin, side * .36, .67, .045, .12, .13, .12)
+      arms.push({ hand })
+      oval(group, palette.skin, side * .36, 1.39, .01, .085, .12, .09)
+    }
+    oval(group, denim, 0, .63, 0, .29, .16, .19)
+    oval(group, palette.shirt, 0, .9, 0, .32, .3, .21)
+    // Rounded head, dot eyes and a small smile echo the supplied civilian refs.
+    oval(group, palette.hair, 0, 1.45, -.045, .385, .39, .29)
+    oval(group, palette.skin, 0, 1.38, .075, .33, .32, .26)
+    const fringe = oval(group, palette.hair, -.075, 1.65, .12, .3, .15, .24)
+    fringe.rotation.z = index % 2 ? -.23 : .22
+    if (index % 3 === 1) {
+      oval(group, palette.hair, .13, 1.83, -.13, .18, .18, .18)
+      for (const side of [-1, 1]) oval(group, '#d4ad68', side * .32, 1.22, .09, .04, .045, .035)
+    }
+    for (const side of [-1, 1]) oval(group, '#18121b', side * .115, 1.4, .318, .035, .057, .022)
+    const smile = new T.QuadraticBezierCurve3(new T.Vector3(-.065, 1.27, .32), new T.Vector3(0, 1.22, .34), new T.Vector3(.065, 1.27, .32))
+    shape(group, new T.TubeGeometry(smile, 8, .012, 5, false), '#231923', 0, 0, 0, false)
+    // Plain tees, jeans and occasional open cardigans: no workplace uniforms.
+    oval(group, '#dfc9b6', 0, 1.15, .08, .115, .042, .13)
+    if (index % 3 === 0) {
+      for (const side of [-1, 1]) oval(group, '#414153', side * .22, .91, .12, .09, .23, .11)
+    }
+    return { group, legs, arms }
+  }
   const guestPositions = [
     { x: 2.4, z: -.1, shirt: '#a6556d', skin: '#87573e', hair: '#242127', scale: 1.07 },
     { x: -3.75, z: -.1, shirt: '#4a7790', skin: '#d79777', hair: '#845133', scale: .92 },
@@ -346,7 +394,7 @@ export function createView(container) {
     { x: .55, z: -2.7, shirt: '#746c9e', skin: '#e0a482', hair: '#663b34', scale: .98 },
   ]
   const guests = guestPositions.map((spec, index) => {
-    const actor = character('guest', spec)
+    const actor = partyGuest(spec, index)
     actor.group.scale.setScalar(spec.scale)
     actor.group.visible = false
     return { actor, spec, departure: guestDepartureTimes[index - 3] ?? Infinity }
@@ -566,6 +614,11 @@ export function createView(container) {
     practical.intensity = returning ? .35 : (blackout ? 3.6 : 15) * unease
     practical.color.set(blackout ? '#a7b8a0' : '#ffc17d')
     stripes.visible = blackout
+    pinClue.visible = game.arcade && blackout && !game.hasPin
+    openDrawer.visible = pinClue.visible && game.setup % 3 === 0
+    raisedCushion.visible = pinClue.visible && game.setup % 3 === 2
+    const cluePositions = [[-2.45, .85, -2.97], [-4.65, 1.03, 1.60], [2.3, .74, 2.38]]
+    pinClue.position.set(...cluePositions[game.setup % 3])
     const dreaming = waking || returning || game.phase === 'blackout'
     const night = party ? Math.min(1, game.introElapsed / partyDuration) : 1
     const cinematic = game.phase === 'descent'
@@ -703,7 +756,7 @@ export function createView(container) {
       pursuer.group.position.set(game.pursuer.x, 0, game.pursuer.z)
       pursuer.group.rotation.y = 0
     }
-    const entity = entityTypes[Math.min(game.encounters, entityTypes.length - 1)]
+    const entity = game.currentEntity()
     if (!phoneRush && !returning) {
       pursuer.group.scale.set(...(streetRun ? [1.12, .96, 1.2] : entity.scale))
       pursuer.group.rotation.x = streetRun ? -.17 : 0
@@ -730,6 +783,8 @@ export function createView(container) {
       poseWisps(actor, time + index * .23)
     })
     labels[2].position.set(game.table.x, 1.42, game.table.z)
+    labels[4].position.set(game.pinSpot.x, 1.24, game.pinSpot.z - .5)
+    labels[4].element.textContent = game.pinSpot.name[0].toUpperCase() + game.pinSpot.name.slice(1)
     for (const [index, { element, position }] of labels.entries()) {
       element.hidden = index >= labels.length - 2 ? game.phase !== 'fireEscape' : game.phase !== 'blackout'
       const projected = position.clone().project(camera)

@@ -25,6 +25,31 @@ npm run preview
 
 ## Controls
 
+### After Midnight
+
+Finish a Story escape to unlock arcade mode on this browser. After Midnight skips
+the party and starts at waking. Read the clue, search the indicated furniture
+(stand still for three seconds), then use the pin at the balcony and reach the
+street exit. The door opens nine seconds after movement returns. Moving the table
+buys seven more seconds; hiding lets the shadow patrol away. One capture ends an
+arcade attempt. Returning to the apartment is also a loss.
+
+There are nine setups: three pin locations crossed with the three existing
+shadows. **Retry this setup** preserves both; **New run** changes at least one.
+First encounters retain the shadow reveal; discovered shadows use a short sound
+cue on subsequent arcade attempts. Unlocks, discoveries and bests are saved to
+local browser storage, with an in-session fallback when storage is unavailable.
+
+The timer covers controllable apartment/fire-escape play, excluding waking and
+the reveal. Score = 10,000 minus 40 per second, plus 250 per close escape (up to
+three bonuses), with a minimum of zero. A close escape means getting within 1.5
+units of the shadow and then hiding or increasing the gap beyond 2.2 units.
+Best score and fastest time are recorded separately for each setup. This is a
+sprint prototype; the intended two-to-three-minute pacing still needs playtesting
+and expansion beyond the current single-room route.
+
+### Story
+
 Select **Start demo** to begin the party and enable sound in your browser. Use the **Mute** button or **M** to toggle sound.
 
 Tap a dialogue response or press **1** or **2**. Each prompt has one response that advances the story. A wrong answer in the apartment changes the current run, even if you retry the blackout. A wrong answer at street level sends you back to that street prompt.
@@ -39,6 +64,17 @@ Tap a dialogue response or press **1** or **2**. Each prompt has one response th
 After the drink sequence, shake the thumbstick left and right or alternate A and D to fill the wake meter. Once the heroine can move, get the release pin and head for the balcony. A barricade can still delay an entry while the door is closed. Interact near the hanging coats to hide or emerge. Find the balcony release pin in the sideboard. Use the pin at the balcony and stay still until the latch opens. Cross the fire escape, step onto the street, and choose whether to check the phone. The ending cutscene leads to a restart screen. If the phone trap catches you, retry the street, shake awake within seven seconds after the light goes out, then run right to the lit intersection. If caught, **Retry blackout** starts a fresh escape attempt. After escaping, **Play again** returns to the date.
 
 ## Verification
+
+Run `npm test` for the simulation/storage checks. Run `npm run test:browser` for
+headless desktop/mobile browser checks (Edge on Windows; installed Playwright
+Chromium on other platforms). The browser checks also save screenshots under
+`test-results/`. They do not replace listening checks or physical iPhone testing.
+
+The apartment uses the supplied **Corrupted Sector 7.mp3**, included under
+`src/assets/audio/`. It loops through the shared mute/master mix; the synthesized
+overworld theme remains outside. The party NPCs use a separate civilian character
+builder inspired by the supplied FedUP references. Heroine and shadow art remain
+separate and unchanged.
 
 The production build passes. The game simulation was exercised for the barricade delay, hiding through entry, successful escape, capture, and a fresh escape after state reset. Browser rendering and physical iPhone input still need a smoke test.
 
