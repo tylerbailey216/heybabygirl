@@ -44,6 +44,16 @@ test('dialogue ducks music, sip reverses it, and fire escape switches to recorde
   await page.addInitScript(() => {
     window.testRoutes = []
     const proto = (window.AudioContext || window.webkitAudioContext).prototype
+    const createGain = proto.createGain
+    proto.createGain = function () {
+      const gain = createGain.call(this)
+      const connect = gain.connect.bind(gain)
+      gain.connect = (target, ...args) => {
+        if (target instanceof BiquadFilterNode && target.frequency.value === 1400) window.testOverworldGain = gain
+        return connect(target, ...args)
+      }
+      return gain
+    }
     const createSource = proto.createMediaElementSource
     proto.createMediaElementSource = function (media) {
       const source = createSource.call(this, media)
@@ -92,6 +102,23 @@ test('dialogue ducks music, sip reverses it, and fire escape switches to recorde
     updateSceneAudio(window.testGame)
   })
   await expect.poll(() => level('light-rain-loop.wav')).toBeGreaterThan(.3)
+  await page.evaluate(() => {
+    // Keep this otherwise idle branch processing: Chromium can leave .value
+    // stale once the final synthesized note disconnects from a GainNode.
+    const probe = window.testOverworldGain.context.createConstantSource()
+    probe.offset.value = 1e-9
+    probe.connect(window.testOverworldGain)
+    probe.start()
+  })
+  for (const phase of ['street', 'phoneDark', 'phoneRush', 'streetDazed', 'streetRun', 'streetSafe']) {
+    await page.evaluate(async phase => {
+      window.testGame.phase = phase
+      const { updateSceneAudio } = await import('/src/entity-audio.js')
+      updateSceneAudio(window.testGame)
+    }, phase)
+    await expect.poll(() => level('light-rain-loop.wav')).toBeGreaterThan(.3)
+    await expect.poll(() => page.evaluate(() => window.testOverworldGain.gain.value)).toBeLessThan(.01)
+  }
   await page.evaluate(async () => {
     window.testGame.phase = 'party'
     const { updateSceneAudio } = await import('/src/entity-audio.js')

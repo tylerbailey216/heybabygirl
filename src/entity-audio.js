@@ -41,7 +41,7 @@ let lastReverseActive = false
 let lastRecordedRain = false
 const apartmentPhases = new Set(['party', 'date', 'sip', 'waking', 'blackout', 'breachIntro', 'returnNightmare'])
 const reversedPhases = new Set(['sip', 'waking', 'blackout', 'breachIntro', 'returnNightmare'])
-const balconyPhases = new Set(['fireEscape', 'descent'])
+const streetPhases = new Set(['street', 'streetDazed', 'streetRun', 'streetSafe', 'phoneDark', 'phoneRush'])
 
 function mediaLoop(url, onError) {
   const media = new window.Audio(url)
@@ -250,7 +250,7 @@ export function updateSceneAudio(game) {
   const changed = phase !== lastPhase || game !== lastGame
   const inApartment = apartmentPhases.has(phase)
   const reverseActive = reversedPhases.has(phase)
-  const recordedRain = balconyPhases.has(phase)
+  const recordedRain = rainyPhases.has(phase)
   if (reverseActive && (!lastReverseActive || game !== lastGame)) reversedTrack.currentTime = 0
   if (recordedRain && (!lastRecordedRain || game !== lastGame)) rainTrack.currentTime = 0
   lastReverseActive = reverseActive
@@ -323,7 +323,7 @@ export function updateSceneAudio(game) {
     }
   }
 
-  const overworldActive = overworldPhases.has(phase) && (!inApartment || apartmentFailed)
+  const overworldActive = overworldPhases.has(phase) && !streetPhases.has(phase) && (!inApartment || apartmentFailed)
   const energy = overworldEnergy(phase)
   overworldMusic.gain.setTargetAtTime(overworldActive ? .29 : 0, now, overworldActive ? .22 : .12)
   overworldFilter.frequency.setTargetAtTime(720 + energy * 1350, now, .24)

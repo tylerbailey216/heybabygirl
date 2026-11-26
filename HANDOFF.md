@@ -20,8 +20,9 @@ sound. Preserve readable navigation and the existing keyboard/touch controls.
   Reverse playback continues through waking/blackout and ends at the fire escape.
   Nightmare retries and arcade waking start the reversed track from the beginning.
 - `src/assets/audio/light-rain-loop.wav` is the supplied Mixkit 2393 recording,
-  used for fireEscape and descent. Synthesized rain remains on the street and is
-  the fallback if the recording cannot play. All tracks share master/mute.
+  used for fireEscape, descent, and all street phases. Street scenes replace the
+  synthesized music with this rain. Synthesized rain is the fallback if the
+  recording cannot play. All tracks share master/mute.
 - Reversed asset generation: `ffmpeg -i src/assets/audio/corrupted-sector-7.mp3
   -af areverse -codec:a libmp3lame -q:a 3
   src/assets/audio/corrupted-sector-7-reversed.mp3` (one command).
