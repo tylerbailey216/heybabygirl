@@ -3,11 +3,11 @@ export function loadProgress(storage) {
   try {
     const data = JSON.parse(storage.getItem(key)) || {}
     return { unlocked: data.unlocked === true, seen: Array.isArray(data.seen) ? data.seen.filter(n => Number.isInteger(n) && n >= 0 && n < 3) : [],
-      bests: data.bests && typeof data.bests === 'object' ? data.bests : {} }
-  } catch { return { unlocked: false, seen: [], bests: {} } }
+      known: Array.isArray(data.known) ? data.known.filter(x => typeof x === 'string') : [], bests: data.scoreVersion === 2 && data.bests && typeof data.bests === 'object' ? data.bests : {} }
+  } catch { return { unlocked: false, seen: [], known: [], bests: {} } }
 }
 export function saveProgress(storage, progress) {
-  try { storage.setItem(key, JSON.stringify(progress)); return true } catch { return false }
+  try { storage.setItem(key, JSON.stringify({ ...progress, scoreVersion: 2 })); return true } catch { return false }
 }
 export function scoreRun(game) {
   return Math.max(0, Math.round(10000 - game.runTime * 40 + Math.min(3, game.closeEncounters) * 250))
@@ -23,3 +23,7 @@ export function recordEscape(progress, game) {
   return newBest
 }
 export const formatTime = seconds => `${Math.floor(seconds / 60)}:${(seconds % 60).toFixed(1).padStart(4, '0')}`
+
+export function dailySetup(date = new Date()) {
+  return Math.floor(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()) / 86400000) % 9
+}

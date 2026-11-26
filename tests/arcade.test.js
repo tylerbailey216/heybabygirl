@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { createGame, newSetup, pinLocations, spots } from '../src/game.js'
-import { loadProgress, saveProgress, recordEscape, scoreRun } from '../src/arcade.js'
+import { loadProgress, saveProgress, recordEscape, scoreRun, dailySetup } from '../src/arcade.js'
 import { nightmareBeat } from '../src/nightmare.js'
 import { phoneBrightness } from '../src/phone.js'
 
@@ -115,7 +115,7 @@ test('one arcade capture ends the run, story retains three encounters', () => {
   assert.notEqual(story.phase, 'caught')
 })
 
-test('balcony escape finishes arcade without story cinematics; time freezes', () => {
+test('arcade continues from balcony into scored street chase; time freezes at safety', () => {
   const game = createGame({}, { mode: 'arcade' })
   awake(game)
   game.hasPin = true
@@ -126,6 +126,9 @@ test('balcony escape finishes arcade without story cinematics; time freezes', ()
   game.update(6, 1, 0)
   assert.equal(game.action(), 'Step onto street')
   game.interact()
+  assert.equal(game.phase, 'streetRun')
+  game.player.x = 61.5; game.player.z = .3
+  game.update(.05, 1, 0)
   assert.equal(game.phase, 'complete')
   const time = game.runTime
   game.update(10, 0, 0)
@@ -205,4 +208,30 @@ test('phone can be switched off without blocking movement; reset restores its li
   game.phoneElapsed = 5
   assert.equal(phoneBrightness(game), .22)
   assert.equal(createGame().phoneOn, true)
+})
+
+
+test('street chase is longer, survivable while moving, and punishes standing still', () => {
+  for (const arcade of [false, true]) {
+    const g = createGame({}, { mode: arcade ? 'arcade' : 'story' })
+    g.phase = 'streetRun'; g.player = { x: 0, z: .35 }; g.pursuer = { x: -3.45, z: .52 }
+    let time = 0
+    while (g.phase === 'streetRun' && time < 30) { g.update(.02, 1, 0); time += .02 }
+    assert.ok(time > 15 && time < 22)
+    assert.equal(g.phase, arcade ? 'complete' : 'streetSafe')
+  }
+  const idle = createGame({}, { mode: 'arcade' })
+  idle.phase = 'streetRun'; idle.pursuer = { x: -3, z: .9 }
+  for (let i = 0; i < 200; i++) idle.update(.02, 0, 0)
+  assert.equal(idle.phase, 'caught')
+})
+
+test('daily challenge is stable in UTC and examination knowledge survives reload', () => {
+  assert.equal(dailySetup(new Date('2026-11-26T00:00:00Z')), dailySetup(new Date('2026-11-26T23:59:59Z')))
+  assert.notEqual(dailySetup(new Date('2026-11-26')), dailySetup(new Date('2026-11-27')))
+  let value
+  const storage = { setItem: (_, v) => { value = v }, getItem: () => value }
+  const progress = loadProgress(storage); progress.known.push('Apartment')
+  saveProgress(storage, progress)
+  assert.deepEqual(loadProgress(storage).known, ['Apartment'])
 })

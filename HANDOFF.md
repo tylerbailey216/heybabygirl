@@ -127,3 +127,28 @@ Review the apartment in party, waking, blackout, and return-nightmare states on
 desktop and phone. Check sound balance with headphones and speakers, mute/restart,
 and reduced motion. Continue with worn architectural detail, stronger focal props,
 and environmental storytelling before extending the style outdoors.
+
+
+### Nightmare replay and navigation milestone
+
+The final street pursuit now covers a full block (about 18 seconds of clean
+running), with brief pursuit surges. Nightmare runs include this chase in their
+timed score; one capture ends the run. Existing same-setup retry and nine
+pin/shadow combinations remain. A UTC daily rotation selects a shared setup;
+Copy challenge copies a result and setup URL without sending anything externally.
+Challenge URLs respect the Story unlock. Daily rotation repeats every nine days.
+
+Object placards are replaced by blue escape, orange hiding, green aid, and yellow
+uncertain-route chevrons. Tap/click to examine; descriptions stay on demand and
+examined locations are saved on this origin. Examination does not pause pursuit.
+Heroine, civilian NPC and shadow art identities are preserved.
+
+Next replay content: additional clue-backed tools and alternate street routes,
+then longer multi-stage challenges. Current runs remain below the earlier 2-3
+minute target. No online leaderboard or anti-cheat service has been introduced.
+
+Validation: 13 simulation checks, production build, all five existing browser
+flows, and the new chevron/daily accessibility browser flow passed. Mobile
+chevron capture reviewed. Old short-course bests reset through scoreVersion 2;
+unlocks, seen entities and examined locations persist. Physical-phone feel and
+performance remain unverified.

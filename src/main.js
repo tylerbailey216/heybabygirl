@@ -4,7 +4,7 @@ import { dateDialogue, streetDialogue } from './dialogue.js'
 import { nightmareBeat } from './nightmare.js'
 import { phonePhases } from './phone.js'
 import { newSetup } from './game.js'
-import { loadProgress, saveProgress, recordEscape, scoreRun, formatTime } from './arcade.js'
+import { loadProgress, saveProgress, recordEscape, scoreRun, formatTime, dailySetup } from './arcade.js'
 import { createView } from './view.js'
 import { bindThumbstick } from './thumbstick.js'
 import { enableEntityAudio, playEntitySound, setAudioMuted, updateSceneAudio } from './entity-audio.js'
@@ -50,6 +50,20 @@ function togglePhone() {
   game.phoneOn = !game.phoneOn
   presentPhone()
 }
+const dailyButton = document.createElement('button')
+dailyButton.textContent = 'Daily nightmare'
+dailyButton.type = 'button'
+document.querySelector('#arcade-start').after(dailyButton)
+dailyButton.addEventListener('click', () => startArcade(dailySetup()))
+const shareButton = document.createElement('button')
+shareButton.textContent = 'Copy challenge'
+shareButton.type = 'button'
+document.querySelector('#new-run').after(shareButton)
+shareButton.addEventListener('click', async () => {
+  const url = new URL(location.href); url.searchParams.set('nightmare', String(game.setup + 1))
+  const text = `Hey Baby Girl - Nightmare ${game.setup + 1}: ${game.phase === 'complete' ? `${formatTime(game.runTime)} / ${scoreRun(game)} points` : 'Can you escape?'} ${url}`
+  try { await navigator.clipboard.writeText(text); shareButton.textContent = 'Challenge copied' } catch { shareButton.textContent = url.href }
+})
 const arcadeStart = document.querySelector('#arcade-start')
 const newRun = document.querySelector('#new-run')
 const storyReturn = document.querySelector('#story-return')
@@ -118,6 +132,8 @@ try {
 }
 
 function present() {
+  document.querySelector('#examination')?.setAttribute('hidden', '')
+  shareButton.textContent = 'Copy challenge'
   presentPhone()
   const { phase } = game
   const waking = phase === 'waking' || phase === 'streetDazed'
@@ -134,6 +150,8 @@ function present() {
     savedLocally = saveProgress(storage, progress)
   }
   arcadeStart.disabled = !progress.unlocked
+  dailyButton.disabled = !progress.unlocked
+  shareButton.hidden = !results || !game.arcade
   arcadeStart.textContent = progress.unlocked ? 'After Midnight' : 'After Midnight · Locked'
   document.querySelector('#unlock-note').textContent = progress.unlocked ? 'New setup. Same nightmare. Beat your best.' : 'Escape Story mode to unlock After Midnight.'
   arcadeHud.hidden = !game.arcade || !playing || waking || !started
@@ -353,7 +371,7 @@ if (view) {
   present()
   startButton.addEventListener('click', startDemo)
   phoneToggle.addEventListener('click', togglePhone)
-  arcadeStart.addEventListener('click', () => startArcade())
+  arcadeStart.addEventListener('click', () => { const challenge = Number(new URL(location.href).searchParams.get('nightmare')); startArcade(Number.isInteger(challenge) && challenge >= 1 && challenge <= 9 ? challenge - 1 : undefined) })
   newRun.addEventListener('click', () => startArcade())
   storyReturn.addEventListener('click', () => {
     game = createGame()
@@ -528,7 +546,7 @@ if (view) {
     else if (game.hidden) hint = 'Hidden · Interact to leave the coats'
     else if (game.barricade && game.elapsed < game.entryAt && !prompt) hint = game.hasPin ? 'Entry blocked · Head to the balcony' : 'Entry blocked · Find the release pin'
     const encounters = game.encounters ? ` · Encounters ${game.encounters}/${encounterLimit}` : ''
-    const message = streetRun ? 'Run right · Reach the lit intersection' : outside ? (prompt ? 'Street level · Step down' : 'Fire escape · Follow the stairs to the right')
+    const message = streetRun ? (game.chaseElapsed % 6 > 4.1 ? 'Footsteps quicken! Keep moving right.' : 'Run right · Reach the lit intersection') : outside ? (prompt ? 'Street level · Step down' : 'Fire escape · Follow the stairs to the right')
       : playing ? `${timing} · ${hint}${encounters}` : ''
     if (message !== statusLine.textContent) statusLine.textContent = message
     if (game.arcade) runClock.textContent = formatTime(game.runTime)
@@ -544,3 +562,30 @@ if (view) {
   }
   requestAnimationFrame(frame)
 }
+
+const examination = document.createElement('aside')
+examination.id = 'examination'
+examination.hidden = true
+examination.setAttribute('aria-live', 'polite')
+const examinationText = document.createElement('p')
+const closeExamination = document.createElement('button')
+closeExamination.textContent = 'Close'
+closeExamination.addEventListener('click', () => { examination.hidden = true })
+examination.append(examinationText, closeExamination)
+gameScreen.append(examination)
+document.addEventListener('examine-place', ({ detail: place }) => {
+  const known = progress.known.includes(place)
+  const descriptions = {
+    Entry: 'Yellow / Uncertain exit. The deadbolt will not release. Checking it alerts what waits outside.',
+    'Hanging coats': 'Orange / Hiding place. Approach and interact to hide. Wait for the shadow to pass before leaving.',
+    'Dining table': 'Green / Escape aid. Drag it toward the entry door to barricade it and buy seven seconds.',
+    'Balcony latch': 'Blue / Escape route. Find the release pin, then hold still while opening the latch.',
+    'Hidden aid': `Green / Hidden release pin. ${game.pinSpot.clue} Approach and interact to search. Moving interrupts the search.`,
+    Apartment: 'Yellow / Danger. Returning inside leads directly to the waiting entity. Continue right.',
+    Landing: 'Blue / Escape route. Approach and interact to descend to the street. Keep moving toward the lit intersection.',
+    Streetlight: 'Blue / Safety. Reach the illuminated crossing at the end of the block. The shadow surges after its footsteps quicken.',
+  }
+  examinationText.textContent = `${known ? 'Remembered: ' : ''}${descriptions[place] || place}`
+  examination.hidden = false
+  if (!known) { progress.known.push(place); saveProgress(storage, progress) }
+})

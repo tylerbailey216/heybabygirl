@@ -18,7 +18,7 @@ export const phoneDarkDuration = 3.2
 export const phoneRushDuration = 1.45
 export const streetLightFade = 1.6
 export const streetWakeSeconds = 7
-export const streetIntersection = { x: 8.75, z: .3 }
+export const streetIntersection = { x: 62, z: .3 }
 export const streetProps = [
   { x: -1.9, z: -.95, w: .65, d: .6 },
   { x: 1.75, z: -.65, w: .72, d: .7 },
@@ -66,7 +66,7 @@ export function createGame(setbacks = {}, options = {}) {
     hidden: false, dragging: false, barricade: false, latch: 0,
     hasPin: false, examinedLatch: false, heardVoice: false, cinematicElapsed: 0, phoneElapsed: 0, streetChaseFailed: false,
     arcade, setup, pinSpot, runTime: 0, closeEncounters: 0, searchRemaining: 0, musicDucked: false, nightmareSeed: Math.random() * Math.PI * 2,
-    phoneOn: true, facing: { x: 1, z: 0 },
+    chaseElapsed: 0, phoneOn: true, facing: { x: 1, z: 0 },
   }
   const entityIndex = () => arcade ? Math.floor(setup / 3) : Math.min(game.encounters, entityTypes.length - 1)
   const currentEntity = () => entityTypes[entityIndex()]
@@ -127,7 +127,10 @@ export function createGame(setbacks = {}, options = {}) {
         break
       case 'Check deadbolt': triggerBreach(); break
       case 'Open balcony latch': game.latch ||= 2.5 + penalties.latch; break
-      case 'Step onto street': game.phase = arcade ? 'complete' : 'street'; break
+      case 'Step onto street':
+        game.phase = arcade ? 'streetRun' : 'street'
+        if (arcade) { Object.assign(game.player, { x: 0, z: .35 }); Object.assign(game.pursuer, { x: -3.45, z: .52 }) }
+        break
       case 'Listen': game.heardVoice = true; break
       case 'Look up': game.phase = 'descent'; break
       case 'End chapter': game.phase = 'complete'; break
@@ -176,6 +179,7 @@ export function createGame(setbacks = {}, options = {}) {
     game.phoneElapsed = 0
     game.wakeProgress = 0
     game.streetChaseFailed = false
+    game.chaseElapsed = 0
     lastShake = undefined
     lastShakeAt = -Infinity
     Object.assign(game.player, { x: 0, z: .35 })
@@ -231,7 +235,7 @@ export function createGame(setbacks = {}, options = {}) {
   }
 
   function update(dt, inputX, inputZ) {
-    if (arcade && (game.phase === 'blackout' || game.phase === 'fireEscape')) game.runTime += dt
+    if (arcade && (game.phase === 'blackout' || game.phase === 'fireEscape' || game.phase === 'streetRun')) game.runTime += dt
     if (game.phase === 'party' || game.phase === 'sip') {
       game.introElapsed += dt
       if (game.phase === 'party' && game.introElapsed >= partyDuration) game.phase = 'date'
@@ -280,19 +284,21 @@ export function createGame(setbacks = {}, options = {}) {
       return
     }
     if (game.phase === 'streetRun') {
+      game.chaseElapsed += dt
       const step = 3.45 * dt / normalizer
-      moveOnStreet(inputX * step, inputZ * step, 9.5)
+      moveOnStreet(inputX * step, inputZ * step, streetIntersection.x + .75)
       if (distance(game.player, streetIntersection) < .92) {
-        game.phase = 'streetSafe'
+        game.phase = arcade ? 'complete' : 'streetSafe'
         return
       }
       const range = distance(game.pursuer, game.player)
       if (range <= .65) {
         game.streetChaseFailed = true
         game.phoneElapsed = 0
-        game.phase = 'phoneRush'
+        game.phase = arcade ? 'caught' : 'phoneRush'
+        game.lossReason = 'The street shadow caught you. Keep moving toward the blue exit chevron.'
       } else {
-        const stride = Math.min(range, dt * 2.48) / range
+        const stride = Math.min(range, dt * (range > 5 ? 3.7 : game.chaseElapsed % 6 > 4.8 ? 3.9 : 2.95)) / range
         game.pursuer.x += (game.player.x - game.pursuer.x) * stride
         game.pursuer.z += (game.player.z - game.pursuer.z) * stride
       }

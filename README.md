@@ -103,3 +103,22 @@ The production build and simulation/storage checks pass. Earlier simulation cove
 Set **Settings → Pages → Build and deployment → Source** to **GitHub Actions**.
 The deployment workflow builds and publishes `dist/` on pushes to `main`.
 The build uses relative asset URLs so it works at the repository's Pages path.
+
+
+### Nightmare replay and navigation milestone
+
+The final street pursuit now covers a full block (about 18 seconds of clean
+running), with brief pursuit surges. Nightmare runs include this chase in their
+timed score; one capture ends the run. Existing same-setup retry and nine
+pin/shadow combinations remain. A UTC daily rotation selects a shared setup;
+Copy challenge copies a result and setup URL without sending anything externally.
+Challenge URLs respect the Story unlock. Daily rotation repeats every nine days.
+
+Object placards are replaced by blue escape, orange hiding, green aid, and yellow
+uncertain-route chevrons. Tap/click to examine; descriptions stay on demand and
+examined locations are saved on this origin. Examination does not pause pursuit.
+Heroine, civilian NPC and shadow art identities are preserved.
+
+Next replay content: additional clue-backed tools and alternate street routes,
+then longer multi-stage challenges. Current runs remain below the earlier 2-3
+minute target. No online leaderboard or anti-cheat service has been introduced.

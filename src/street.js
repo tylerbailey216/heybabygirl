@@ -1,6 +1,7 @@
 import * as T from 'three'
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js'
+import { streetIntersection } from './game.js'
 import kitUrl from './assets/models/street-kit.glb?url'
 
 export function dressStreet(group) {
@@ -29,18 +30,18 @@ export function dressStreet(group) {
   map.wrapS = map.wrapT = T.RepeatWrapping
   map.repeat.set(6, 5)
   const roadMaterial = new T.MeshStandardMaterial({ map, roughness: .42, metalness: .18 })
-  new GLTFLoader().load(kitUrl, ({ scene }) => group.add(scene), undefined, error => console.error('Street kit unavailable', error))
+  new GLTFLoader().load(kitUrl, ({ scene }) => { for (let i = 0; i < 4; i++) { const block = scene.clone(true); block.position.x = i * 21; group.add(block) } }, undefined, error => console.error('Street kit unavailable', error))
 
   const paving = new T.MeshStandardMaterial({ color: '#57505b', roughness: .64 })
-  const slabs = new T.InstancedMesh(new RoundedBoxGeometry(.68, .1, .82, 1, .025), paving, 56)
+  const slabs = new T.InstancedMesh(new RoundedBoxGeometry(.68, .1, .82, 1, .025), paving, 208)
   const matrix = new T.Matrix4()
-  for (let i = 0; i < 56; i++) {
-    matrix.makeTranslation(-4.6 + i % 28 * .7, .09, -2.48 - Math.floor(i / 28) * .85)
+  for (let i = 0; i < 208; i++) {
+    matrix.makeTranslation(-4.6 + i % 104 * .7, .09, -2.48 - Math.floor(i / 104) * .85)
     slabs.setMatrixAt(i, matrix)
   }
   group.add(slabs)
-  const curbs = new T.InstancedMesh(new RoundedBoxGeometry(.68, .2, .22, 1, .035), paving, 28)
-  for (let i = 0; i < 28; i++) { matrix.makeTranslation(-4.6 + i * .7, .035, -1.94); curbs.setMatrixAt(i, matrix) }
+  const curbs = new T.InstancedMesh(new RoundedBoxGeometry(.68, .2, .22, 1, .035), paving, 104)
+  for (let i = 0; i < 104; i++) { matrix.makeTranslation(-4.6 + i * .7, .035, -1.94); curbs.setMatrixAt(i, matrix) }
   group.add(curbs)
   const wet = new T.MeshStandardMaterial({ color: '#49495b', roughness: .09, metalness: .5, transparent: true, opacity: .2, depthWrite: false })
   for (let i = 0; i < 18; i++) {
@@ -71,7 +72,7 @@ export function dressStreet(group) {
   for (let i = 0; i < 14; i++) {
     const streak = new T.Mesh(new T.PlaneGeometry(.3 + random() * .7, .015 + random() * .04), reflections)
     streak.rotation.x = -Math.PI / 2
-    streak.position.set(8.2 + random() * 1.2, .025, -1 + i * .22)
+    streak.position.set(streetIntersection.x - .55 + random() * 1.2, .025, -1 + i * .22)
     group.add(streak)
   }
   return roadMaterial

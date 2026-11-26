@@ -427,3 +427,12 @@ kbd{border:1px solid #bd8f8170;border-radius:4px;padding:.1rem .3rem;margin-left
   .arcade-results .ending-artwork{min-height:0}
   #run-result{font-size:.78rem;margin:6px auto}
 }
+
+.marker{pointer-events:auto;width:44px;height:44px;padding:0;border:0;background:transparent;color:#6ac5ff;font-size:36px;font-weight:900;line-height:32px;text-shadow:0 0 5px currentColor;animation:chevron-glint 2.4s ease-in-out infinite;cursor:pointer}
+.marker[data-kind="hide"]{color:#ff964a}.marker[data-kind="aid"]{color:#70ed9a}.marker[data-kind="uncertain"]{color:#ffe16a}
+@keyframes chevron-glint{0%,100%{filter:brightness(.8);text-shadow:0 0 3px currentColor}50%{filter:brightness(1.55);text-shadow:0 0 10px currentColor}}
+#examination{position:absolute;z-index:15;top:88px;left:50%;transform:translateX(-50%);width:min(360px,86%);padding:12px;background:#191321ed;border:1px solid #b98baf;border-radius:12px;font-size:.85rem;box-shadow:0 8px 28px #0008}
+#examination p{margin:0 0 8px}#examination button{min-height:44px}
+@media(prefers-reduced-motion:reduce){.marker{animation:none}}
+
+.marker::after{content:"";display:block;width:12px;height:12px;border-right:4px solid currentColor;border-bottom:4px solid currentColor;transform:rotate(45deg);margin:5px auto;filter:drop-shadow(0 0 3px currentColor)}

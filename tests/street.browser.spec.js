@@ -33,7 +33,7 @@ test('street phone HUD remains usable on mobile and drives the visible flashligh
   expect(button.y + button.height).toBeLessThan(844)
   await page.screenshot({ path: 'test-results/street-mobile.png' })
   await page.keyboard.down('d')
-  await expect(page.locator('#game')).toHaveAttribute('data-phase', 'streetSafe', { timeout: 18000 })
+  await expect(page.locator('#game')).toHaveAttribute('data-phase', 'streetSafe', { timeout: 90000 })
   await page.keyboard.up('d')
   await page.setViewportSize({ width: 900, height: 650 })
   await page.screenshot({ path: 'test-results/intersection-safe.png' })

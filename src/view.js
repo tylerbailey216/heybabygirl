@@ -486,7 +486,7 @@ export function createView(container) {
   const phoneStreet = new T.Group()
   phoneStreet.visible = false
   scene.add(phoneStreet)
-  const streetRoad = box(phoneStreet, '#23283a', 4.5, -.13, .15, 19, .25, 13.2, false)
+  const streetRoad = box(phoneStreet, '#23283a', 32, -.13, .15, 76, .25, 13.2, false)
   streetRoad.material = dressStreet(phoneStreet)
   for (let i = 0; i < 6; i++) {
     box(phoneStreet, '#9a9da9', streetIntersection.x, .006, -1.28 + i * .57, 1.65, .016, .23, false)
@@ -526,10 +526,16 @@ export function createView(container) {
     ['Sideboard', spots.drawer.x, 1.24, -3.3],
     ['Apartment', spots.returnDoor.x, 1.4, -.6],
     ['Landing', spots.landing.x, floorHeight(spots.landing.x) + .83, 0],
+    ['Streetlight', streetIntersection.x, 1.8, .3],
   ].map(([name, x, y, z]) => {
-    const element = document.createElement('span')
+    const element = document.createElement('button')
     element.className = 'marker'
-    element.textContent = name
+    element.type = 'button'
+    element.dataset.place = name
+    element.dataset.kind = ({ Entry: 'uncertain', 'Hanging coats': 'hide', 'Dining table': 'aid', 'Balcony latch': 'escape', Sideboard: 'aid', Apartment: 'uncertain', Landing: 'escape', Streetlight: 'escape' })[name]
+    element.setAttribute('aria-label', `Examine ${name}`)
+    element.textContent = ''
+    element.addEventListener('click', () => document.dispatchEvent(new CustomEvent('examine-place', { detail: element.dataset.place })))
     markers.append(element)
     return { element, position: new T.Vector3(x, y, z) }
   })
@@ -803,12 +809,13 @@ export function createView(container) {
     })
     labels[2].position.set(game.table.x, 1.42, game.table.z)
     labels[4].position.set(game.pinSpot.x, 1.24, game.pinSpot.z - .5)
-    labels[4].element.textContent = game.pinSpot.name[0].toUpperCase() + game.pinSpot.name.slice(1)
+    labels[4].element.dataset.place = 'Hidden aid'
+    labels[4].element.setAttribute('aria-label', `Examine ${game.pinSpot.name}`)
     for (const [index, { element, position }] of labels.entries()) {
-      element.hidden = index >= labels.length - 2 ? game.phase !== 'fireEscape' : game.phase !== 'blackout'
+      element.hidden = index === 7 ? game.phase !== 'streetRun' : index >= 5 ? game.phase !== 'fireEscape' : game.phase !== 'blackout'
       const projected = position.clone().project(camera)
-      element.style.left = `${(projected.x + 1) * 50}%`
-      element.style.top = `${(1 - projected.y) * 50}%`
+      element.style.left = `${Math.max(5, Math.min(95, (projected.x + 1) * 50))}%`
+      element.style.top = `${Math.max(15, Math.min(78, (1 - projected.y) * 50))}%`
     }
     for (let i = 0; i < 72; i++) {
       const x = ((i * .61803399) % 1) * 2.77 - 1.38
